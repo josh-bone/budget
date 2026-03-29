@@ -5,3 +5,12 @@ data/
 .ipynb
 .DS_Store
 venv/
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.bak
+*.tmp
+*.swp
