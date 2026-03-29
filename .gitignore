@@ -1,11 +1,11 @@
-.csv
-.xsls
-.xlsx
+*.csv
+*.xsls
+*.xlsx
 data/
-.ipynb
+*.ipynb
 .DS_Store
 venv/
-.env
+*.env
 __pycache__/
 *.pyc
 *.pyo
@@ -14,3 +14,6 @@ __pycache__/
 *.bak
 *.tmp
 *.swp
+deprecated/
+*.toml
+!sample_config.toml
