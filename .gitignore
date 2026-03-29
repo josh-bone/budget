@@ -6,6 +6,7 @@
 .csv
 .xsls
 .xlsx
-data/**
+data/
 .ipynb
 .DS_Store
+venv/
