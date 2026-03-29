@@ -1,8 +1,3 @@
-# NOTE: This should not ever be a Git repository.
-# If you find a .git directory here, it was likely created by mistake.
-# Please remove it to avoid confusion.
-# Still, I'm adding this to make sure that, even if I make that mistake, I never accidentally upload my private budget data to a public repository.
-
 .csv
 .xsls
 .xlsx
