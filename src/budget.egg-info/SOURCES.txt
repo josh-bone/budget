@@ -5,4 +5,5 @@ src/budget/sheets.py
 src/budget.egg-info/PKG-INFO
 src/budget.egg-info/SOURCES.txt
 src/budget.egg-info/dependency_links.txt
+src/budget.egg-info/requires.txt
 src/budget.egg-info/top_level.txt

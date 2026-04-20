@@ -18,3 +18,4 @@ deprecated/
 *.toml
 !sample_config.toml
 *.ignore
+build/

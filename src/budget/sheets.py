@@ -18,8 +18,6 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-load_dotenv()
-
 try:
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
@@ -35,22 +33,26 @@ except ImportError:
 
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-TOML_PATH = Path(__file__).parent / "config.toml"
+TOML_PATH = Path(__file__).parents[2] / "config.toml"
 
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 
 
+class ConfigError(Exception):
+    pass
+
+
 def get_env(key: str) -> str:
     value = os.environ.get(key, "").strip()
     if not value:
-        sys.exit(f"Error: environment variable '{key}' is not set.")
+        raise ValueError(f"Error: environment variable '{key}' is not set.")
     return value
 
 
 def load_toml() -> dict[str, Any]:
     if not TOML_PATH.exists():
-        sys.exit(f"Error: config file not found at {TOML_PATH}")
+        raise FileNotFoundError(f"Error: config file not found at {TOML_PATH}")
     with open(TOML_PATH, "rb") as f:
         return tomllib.load(f)
 
@@ -107,6 +109,8 @@ def print_section(
 
 
 def main():
+    # Environment variables
+    load_dotenv()
     key_file = get_env("GOOGLE_SERVICE_ACCOUNT_KEY")
     spreadsheet_id = get_env("SPREADSHEET_ID")
 
@@ -114,19 +118,20 @@ def main():
 
     sheet = config.get("spreadsheet", {}).get("sheet")
     if not sheet:
-        sys.exit("Error: [spreadsheet] sheet = '...' is missing from config.toml")
+        raise ConfigError(
+            "Error: [spreadsheet] sheet = '...' is missing from config.toml"
+        )
 
     cells_config: dict[str, dict[str, str]] = config.get("cells", {})
     if not cells_config:
-        sys.exit("Error: no [cells.*] sections found in config.toml")
-
+        raise ConfigError("Error: no [cells.*] sections found in config.toml")
     # Collect all cell references across all sections
     all_refs: list[str] = []
     for labels in cells_config.values():
         all_refs.extend(labels.values())
 
     if not all_refs:
-        sys.exit("Error: no cell references defined in config.toml")
+        raise ConfigError("Error: no cell references defined in config.toml")
 
     print("Connecting to Google Sheets...")
     service = build_service(key_file)
