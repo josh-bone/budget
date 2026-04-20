@@ -17,3 +17,4 @@ __pycache__/
 deprecated/
 *.toml
 !sample_config.toml
+*.ignore
