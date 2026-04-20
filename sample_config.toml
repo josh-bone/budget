@@ -1,0 +1,21 @@
+[spreadsheet]
+sheet = "Budget"  # The tab name to read from
+ 
+# Define the cells you care about as label = "CellRef"
+# You can organize them into any sections you like.
+# Cell references use standard A1 notation (e.g. "B3", "C12").
+ 
+[cells.income]
+salary = "B3"
+freelance = "B4"
+ 
+[cells.expenses]
+rent = "C7"
+groceries = "C10"
+utilities = "C11"
+transport = "C12"
+ 
+[cells.summary]
+total_income = "F3"
+total_expenses = "F20"
+balance = "F22"
