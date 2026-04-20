@@ -4,7 +4,7 @@
 data/
 *.ipynb
 .DS_Store
-venv/
+*venv*/
 *.env
 __pycache__/
 *.pyc
