@@ -3,5 +3,5 @@
 ## Usage
 
 ```
-python sheets.py
+python src/buget/cli.py
 ```

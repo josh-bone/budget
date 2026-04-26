@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Budget · {{ sheet_name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@300;400&family=DM+Sans:wght@300;400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:       #f5f1eb;
+      --surface:  #ede9e1;
+      --border:   #d4cfc6;
+      --ink:      #1a1814;
+      --muted:    #6b6760;
+      --positive: #2d6a4f;
+      --negative: #c0392b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg); color: var(--ink);
+      font-family: 'DM Sans', sans-serif; font-weight: 300;
+      min-height: 100vh; padding: 3rem 1.5rem 6rem;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 999;
+    }
+
+    .wrap { max-width: 680px; margin: 0 auto; }
+
+    /* ── Nav ── */
+    nav {
+      display: flex; align-items: center; gap: 1rem;
+      margin-bottom: 2rem;
+      animation: fadeUp .3s ease both;
+    }
+    .back-link {
+      font-family: 'DM Mono', monospace; font-size: .65rem;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--muted); text-decoration: none;
+      border-bottom: 1px solid var(--border); padding-bottom: 1px;
+      transition: color .2s, border-color .2s;
+    }
+    .back-link:hover { color: var(--ink); border-bottom-color: var(--ink); }
+
+    .month-picker {
+      margin-left: auto;
+      font-family: 'DM Mono', monospace; font-size: .7rem;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--ink); padding: .35rem .6rem; border-radius: 3px;
+      cursor: pointer; letter-spacing: .05em;
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b6760'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right .5rem center;
+      padding-right: 1.5rem;
+    }
+
+    /* ── Header ── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.5rem; margin-bottom: 2.5rem;
+      animation: fadeUp .4s .05s ease both;
+    }
+    .eyebrow {
+      font-family: 'DM Mono', monospace; font-size: .65rem;
+      letter-spacing: .18em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: .4rem;
+    }
+    h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2rem, 5vw, 2.8rem);
+      font-weight: 600; letter-spacing: -.02em; line-height: 1.1;
+    }
+
+    /* ── Error ── */
+    .error-box {
+      background: #fdf0ef; border: 1px solid #e8b4b0;
+      border-radius: 4px; padding: 1.25rem 1.5rem;
+      font-family: 'DM Mono', monospace; font-size: .8rem;
+      color: var(--negative);
+    }
+
+    /* ── Summary strip ── */
+    .summary {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1px; background: var(--border);
+      border: 1px solid var(--border); border-radius: 6px;
+      overflow: hidden; margin-bottom: 3rem;
+      animation: fadeUp .4s .1s ease both;
+    }
+    .summary-cell {
+      background: var(--surface); padding: 1.4rem 1.1rem;
+      display: flex; flex-direction: column; gap: .35rem;
+    }
+    .summary-label {
+      font-family: 'DM Mono', monospace; font-size: .6rem;
+      letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+    }
+    .summary-value {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.5rem; font-weight: 600; letter-spacing: -.02em;
+    }
+    .summary-value.positive { color: var(--positive); }
+    .summary-value.negative { color: var(--negative); }
+
+    /* ── Sections ── */
+    .section {
+      margin-bottom: 2.5rem;
+      animation: fadeUp .4s ease both;
+    }
+    .section:nth-child(1) { animation-delay: .15s; }
+    .section:nth-child(2) { animation-delay: .22s; }
+
+    .section-header {
+      display: flex; align-items: baseline; gap: 1rem;
+      margin-bottom: .75rem;
+    }
+    .section-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.1rem; font-weight: 400;
+    }
+    .section-rule { flex: 1; height: 1px; background: var(--border); }
+
+    .row {
+      display: grid; grid-template-columns: 1fr auto;
+      align-items: baseline; padding: .6rem 0;
+      border-bottom: 1px solid var(--border); gap: 1rem;
+      transition: background .15s;
+    }
+    .row:last-child { border-bottom: none; }
+    .row:hover {
+      background: var(--surface);
+      margin: 0 -.6rem; padding: .6rem .6rem; border-radius: 3px;
+    }
+    .row-label {
+      font-size: .88rem; text-transform: capitalize; letter-spacing: .01em;
+    }
+    .row-meta {
+      font-family: 'DM Mono', monospace; font-size: .62rem;
+      color: var(--muted); margin-left: .3rem;
+    }
+    .row-value {
+      font-family: 'DM Mono', monospace; font-size: .88rem;
+      text-align: right; white-space: nowrap;
+    }
+    .row-value.empty { color: var(--muted); font-style: italic; }
+
+    footer {
+      margin-top: 4rem; padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      font-family: 'DM Mono', monospace; font-size: .62rem;
+      color: var(--muted); letter-spacing: .08em;
+      animation: fadeUp .4s .4s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @media (max-width: 480px) {
+      .summary { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav>
+    <a class="back-link" href="/">← All months</a>
+    {% if months %}
+    <select class="month-picker" onchange="window.location='/month/'+encodeURIComponent(this.value)">
+      {% for m in months %}
+      <option value="{{ m }}" {% if m == sheet_name %}selected{% endif %}>{{ m }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+  </nav>
+
+  <header>
+    <p class="eyebrow">Monthly Detail</p>
+    <h1>{{ sheet_name }}</h1>
+  </header>
+
+  {% if error %}
+    <div class="error-box">{{ error }}</div>
+
+  {% elif budget %}
+
+    {% set s = budget.get('summary', {}) %}
+    <div class="summary">
+      <div class="summary-cell">
+        <span class="summary-label">Net Income</span>
+        <span class="summary-value">
+          {% if s.net_income is not none %}${{ "%.2f"|format(s.net_income) }}{% else %}—{% endif %}
+        </span>
+      </div>
+      <div class="summary-cell">
+        <span class="summary-label">Total Expenses</span>
+        <span class="summary-value">
+          {% if s.total_expenses is not none %}${{ "%.2f"|format(s.total_expenses) }}{% else %}—{% endif %}
+        </span>
+      </div>
+      <div class="summary-cell">
+        <span class="summary-label">Remaining</span>
+        <span class="summary-value {% if s.diff is not none %}{% if s.diff >= 0 %}positive{% else %}negative{% endif %}{% endif %}">
+          {% if s.diff is not none %}${{ "%.2f"|format(s.diff) }}{% else %}—{% endif %}
+        </span>
+      </div>
+    </div>
+
+    {% for section_name, rows in budget.items() %}
+      {% if section_name != 'summary' and rows is iterable and rows is not string %}
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">{{ section_name | capitalize }}</span>
+          <div class="section-rule"></div>
+        </div>
+        {% for row in rows %}
+        <div class="row">
+          <span class="row-label">
+            {{ row.label | replace('_', ' ') }}
+            <span class="row-meta">{{ row.cell }}</span>
+          </span>
+          {% if row.value is not none %}
+            <span class="row-value">${{ "%.2f"|format(row.value) }}</span>
+          {% else %}
+            <span class="row-value empty">—</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endfor %}
+
+  {% endif %}
+
+  <footer>
+    Data pulled live from Google Sheets &nbsp;·&nbsp; <a class="back-link" href="/">View all months</a>
+  </footer>
+
+</div>
+</body>
+</html>
