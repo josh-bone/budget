@@ -19,3 +19,4 @@ deprecated/
 !sample_config.toml
 *.ignore
 build/
+deploy.sh

@@ -31,9 +31,11 @@ def get_locale() -> str:
 
 
 def load_toml() -> dict[str, Any]:
-    if CONFIG_PATH is None:
+    config_path_str = os.environ.get("BUDGET_CONFIG")
+    if config_path_str is None:
         raise ConfigError("Error: BUDGET_CONFIG environment variable is not set.")
-    if not CONFIG_PATH.exists():
-        raise FileNotFoundError(f"Error: config file not found at {CONFIG_PATH}")
-    with open(CONFIG_PATH, "rb") as f:
+    config_path = Path(config_path_str)
+    if not config_path.exists():
+        raise FileNotFoundError(f"Error: config file not found at {config_path}")
+    with open(config_path, "rb") as f:
         return tomllib.load(f)
