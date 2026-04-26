@@ -15,7 +15,7 @@ __pycache__/
 *.tmp
 *.swp
 deprecated/
-*.toml
+*config.toml
 !sample_config.toml
 *.ignore
 build/
