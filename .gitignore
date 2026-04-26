@@ -13,7 +13,10 @@ __pycache__/
 *.log
 *.bak
 *.tmp
-*.swp
+*egg-info/
+*.egg-info/
+src/*.egg-info/
+.eggs/
 deprecated/
 *config.toml
 !sample_config.toml
