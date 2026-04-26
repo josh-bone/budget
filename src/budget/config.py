@@ -4,7 +4,6 @@ from typing import Any
 
 import tomllib
 
-CONFIG_PATH = Path(os.environ.get("BUDGET_CONFIG"))
 DEFAULT_LOCALE = "en_US.UTF-8"
 
 
