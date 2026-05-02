@@ -12,6 +12,7 @@ Run:
 
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import quote, unquote
 
 from dotenv import load_dotenv
@@ -28,12 +29,14 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Expose urlencode in Jinja templates
 app.jinja_env.filters["urlencode"] = quote
+
+# Max parallel Sheets API requests. The API is I/O-bound so this is safe to
+# tune upward, but 6 is plenty for ~12 month tabs without hammering the quota.
+_MAX_WORKERS = int(os.environ.get("BUDGET_FETCH_WORKERS", 6))
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-
 
 def _sort_key(sheet_name: str):
     """Sort 'M/YYYY' tab names chronologically."""
@@ -51,42 +54,77 @@ def _cache_ttl() -> int:
         return 300
 
 
+def _fetch_one(
+    service,
+    spreadsheet_id: str,
+    sheet: str,
+    all_refs: list[str],
+    cells_config: dict,
+    summary_config: dict,
+) -> tuple[str, dict]:
+    """Fetch and build budget for a single sheet. Designed for thread use."""
+    logger.info(f"  Fetching '{sheet}'...")
+    cell_values = fetch_cells(service, spreadsheet_id, sheet, all_refs)
+    budget = build_budget(cells_config, cell_values, summary_config)
+    return sheet, budget
+
+
 def load_all_months() -> dict[str, dict]:
     """
-    Fetch budget data for every matching sheet tab.
+    Fetch budget data for every matching sheet tab in parallel.
     Returns dict keyed by sheet name, sorted oldest -> newest.
     """
     cached = budget_cache.get()
     if cached is not None:
         return cached
 
-    key_file = get_env("GOOGLE_SERVICE_ACCOUNT_KEY")
+    key_file       = get_env("GOOGLE_SERVICE_ACCOUNT_KEY")
     spreadsheet_id = get_env("SPREADSHEET_ID")
-    config = load_toml()
+    config         = load_toml()
 
-    pattern = config.get("spreadsheet", {}).get("sheet_pattern")
-    cells_config = config.get("cells", {})
+    pattern        = config.get("spreadsheet", {}).get("sheet_pattern")
+    cells_config   = config.get("cells", {})
+    summary_config = config.get("summary", {})
 
     if not cells_config:
         raise ConfigError("No [cells.*] sections found in config.toml")
 
-    all_refs = list(
-        dict.fromkeys(
-            ref for labels in cells_config.values() for ref in labels.values()
-        )
-    )
+    all_refs = list(dict.fromkeys(
+        ref for labels in cells_config.values() for ref in labels.values()
+    ))
 
-    service = build_service(key_file)
+    service     = build_service(key_file)
     sheet_names = list_sheet_names(service, spreadsheet_id, pattern=pattern)
     sheet_names.sort(key=_sort_key)
 
-    logger.info(f"Discovered {len(sheet_names)} sheet(s): {sheet_names}")
+    logger.info(f"Discovered {len(sheet_names)} sheet(s), fetching with {_MAX_WORKERS} workers...")
 
     result: dict[str, dict] = {}
-    for sheet in sheet_names:
-        logger.info(f"  Fetching '{sheet}'...")
-        cell_values = fetch_cells(service, spreadsheet_id, sheet, all_refs)
-        result[sheet] = build_budget(cells_config, cell_values)
+
+    with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
+        futures = {
+            executor.submit(
+                _fetch_one,
+                service,
+                spreadsheet_id,
+                sheet,
+                all_refs,
+                cells_config,
+                summary_config,
+            ): sheet
+            for sheet in sheet_names
+        }
+        for future in as_completed(futures):
+            sheet = futures[future]
+            try:
+                sheet_name, budget = future.result()
+                result[sheet_name] = budget
+            except Exception as e:
+                logger.error(f"Failed to fetch sheet '{sheet}': {e}")
+                raise
+
+    # Re-sort after parallel completion (arrival order is non-deterministic)
+    result = dict(sorted(result.items(), key=lambda kv: _sort_key(kv[0])))
 
     budget_cache.set(result)
     return result
@@ -94,35 +132,34 @@ def load_all_months() -> dict[str, dict]:
 
 def build_trends(all_months: dict[str, dict]) -> dict:
     """Derive cross-month trend data from all loaded months."""
-    months = list(all_months.keys())
-    income = [all_months[m]["summary"].get("net_income") for m in months]
-    expenses = [all_months[m]["summary"].get("total_expenses") for m in months]
-    diff = [all_months[m]["summary"].get("diff") for m in months]
+    months   = list(all_months.keys())
+    income   = [all_months[m]["summary"].get("net_income")     for m in months]
+    expenses = [all_months[m]["summary"].get("total_expenses")  for m in months]
+    diff     = [all_months[m]["summary"].get("disposable")      for m in months]
 
     def _sum(vals):
         return sum(v for v in vals if v is not None)
 
     return {
-        "months": months,
-        "income": income,
-        "expenses": expenses,
-        "diff": diff,
-        "total_income": _sum(income),
+        "months":         months,
+        "income":         income,
+        "expenses":       expenses,
+        "diff":           diff,
+        "total_income":   _sum(income),
         "total_expenses": _sum(expenses),
-        "avg_income": _sum(income) / len(months) if months else 0,
-        "avg_expenses": _sum(expenses) / len(months) if months else 0,
+        "avg_income":     _sum(income)   / len(months) if months else 0,
+        "avg_expenses":   _sum(expenses) / len(months) if months else 0,
     }
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
-
 
 @app.route("/")
 def index():
     error = all_months = trends = fetched_at = None
     try:
         all_months = load_all_months()
-        trends = build_trends(all_months)
+        trends     = build_trends(all_months)
         fetched_at = budget_cache.fetched_at
     except Exception as e:
         logger.exception("Failed to load budget")

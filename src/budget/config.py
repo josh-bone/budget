@@ -20,15 +20,6 @@ def get_env(key: str) -> str:
     return value
 
 
-def get_locale() -> str:
-    locale = os.environ.get("LOCALE", default=DEFAULT_LOCALE).strip()
-    if not locale:
-        raise ConfigError(
-            "Error: LOCALE environment variable is not set.\nSet it to something like 'en_US.UTF-8'."
-        )
-    return locale
-
-
 def load_toml() -> dict[str, Any]:
     config_path_str = os.environ.get("BUDGET_CONFIG")
     if config_path_str is None:

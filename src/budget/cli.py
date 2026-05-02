@@ -24,26 +24,25 @@ def main():
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))
 
-    # Environment variables
     load_dotenv()
     key_file = get_env("GOOGLE_SERVICE_ACCOUNT_KEY")
     spreadsheet_id = get_env("SPREADSHEET_ID")
 
     config = load_toml()
+    cells_config = config.get("cells", {})
+    summary_config = config.get("summary", {})
 
-    cells_config: dict[str, dict[str, str]] = config.get("cells", {})
     if not cells_config:
         raise ConfigError("Error: no [cells.*] sections found in config.toml")
-    # Collect all cell references across all sections
-    all_refs: list[str] = []
-    for labels in cells_config.values():
-        all_refs.extend(labels.values())
+
+    all_refs = list(
+        dict.fromkeys(
+            ref for labels in cells_config.values() for ref in labels.values()
+        )
+    )
 
     if not all_refs:
         raise ConfigError("Error: no cell references defined in config.toml")
-
-    # Deduplicate cell references
-    all_refs = list(dict.fromkeys(all_refs))
 
     logger.info("Connecting to Google Sheets...")
     service: Resource = build_service(key_file)
@@ -55,10 +54,12 @@ def main():
     ):
         logger.info(f"Fetching {len(all_refs)} cell(s) from sheet '{sheet}'...")
         cell_values = fetch_cells(service, spreadsheet_id, sheet, all_refs)
+        budget = build_budget(cells_config, cell_values, summary_config)
 
-        budget = build_budget(cells_config, cell_values)
+        print(f"\n{'═' * 45}")
+        print(f"  {sheet}")
+        print(f"{'═' * 45}")
 
-        logger.debug(f"{budget=}")
         for section_name, rows in budget.items():
             print_section(section_name, rows)
 
