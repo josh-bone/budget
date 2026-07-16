@@ -4,6 +4,9 @@ sheets.py — Google Sheets access layer.
 
 import re
 
+import pandas as pd
+from pandas.api.types import is_string_dtype
+
 from budget.utils import cast_to_float
 
 try:
@@ -23,6 +26,32 @@ def build_service(key_file: str) -> Resource:
         key_file, scopes=SCOPES
     )
     return build("sheets", "v4", credentials=creds)
+
+
+def get_balances_df(service: Resource, spreadsheet_id: str) -> pd.DataFrame:
+    sheet = "Balances"
+    range_ = f"{sheet}!A1:Z1000"
+    response = (
+        service.spreadsheets()
+        .values()
+        .get(
+            spreadsheetId=spreadsheet_id,
+            range=range_,
+        )
+        .execute()
+    )
+    values = response.get("values", [])
+
+    df = pd.DataFrame(values[1:], columns=values[0])
+
+    # Convert Amount to numeric
+    if "Amount" in df.columns:
+        if is_string_dtype(df["Amount"]):
+            df["Amount"] = (
+                df["Amount"].str.replace("$", "").str.replace(",", "").astype(float)
+            )  # Assumes currency format like "$1,234.56"
+
+    return df
 
 
 def list_sheet_names(
