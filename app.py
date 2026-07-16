@@ -35,6 +35,9 @@ app.jinja_env.filters["urlencode"] = quote
 # Max parallel Sheets API requests. The API is I/O-bound so this is safe to
 # tune upward, but 6 is plenty for ~12 month tabs without hammering the quota.
 _MAX_WORKERS = int(os.environ.get("BUDGET_FETCH_WORKERS", 6))
+_RESULT_TIMEOUT = int(
+    os.environ.get("BUDGET_RESULT_TIMEOUT", 20)
+)  # how long to wait on future.result()
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -107,27 +110,28 @@ def load_all_months() -> dict[str, dict]:
 
     result: dict[str, dict] = {}
 
-    start_times = {}
     with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
         futures = {}
+        start_times = {}
         for sheet in sheet_names:
             start_times[sheet] = time.monotonic()
-            future = executor.submit(
-                _fetch_one,
-                service,
-                spreadsheet_id,
-                sheet,
-                all_refs,
-                cells_config,
-                summary_config,
-            )
-            futures[future] = sheet
+            futures[
+                executor.submit(
+                    _fetch_one,
+                    service,
+                    spreadsheet_id,
+                    sheet,
+                    all_refs,
+                    cells_config,
+                    summary_config,
+                )
+            ] = sheet
 
-        for future in as_completed(futures):
+        for future in as_completed(futures, timeout=_RESULT_TIMEOUT * len(futures)):
             sheet = futures[future]
             elapsed = time.monotonic() - start_times[sheet]
             try:
-                sheet_name, budget = future.result()
+                sheet_name, budget = future.result(timeout=_RESULT_TIMEOUT)
                 result[sheet_name] = budget
                 log_fn = logger.warning if elapsed > 5 else logger.info
                 log_fn(f"Fetched sheet '{sheet}' in {elapsed:.2f}s")
@@ -135,7 +139,6 @@ def load_all_months() -> dict[str, dict]:
                 logger.error(
                     f"Failed to fetch sheet '{sheet}' after {elapsed:.2f}s: {e}"
                 )
-                raise
 
     # Re-sort after parallel completion (arrival order is non-deterministic)
     result = dict(sorted(result.items(), key=lambda kv: _sort_key(kv[0])))
