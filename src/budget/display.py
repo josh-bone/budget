@@ -44,7 +44,9 @@ def print_section(section_name: str, rows) -> None:
         tabulate(table, headers=["Label", "Cell", "Value"], tablefmt="rounded_outline")
     )
 
+
 # TODO: Move all plotting to frontend and remove matplotlib dependency
+
 
 def plot_accounts_on_ax(
     pivot: pd.DataFrame,

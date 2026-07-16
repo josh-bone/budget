@@ -4,6 +4,7 @@ from budget.utils import cast_to_float
 
 # ── Happy path ─────────────────────────────────────────────────────────────────
 
+
 def test_plain_integer_string():
     assert cast_to_float("1000") == 1000.0
 
@@ -37,6 +38,7 @@ def test_negative_comma_number():
 
 
 # ── Error cases ────────────────────────────────────────────────────────────────
+
 
 def test_non_string_int_raises():
     with pytest.raises(ValueError, match="Expected a string or None"):

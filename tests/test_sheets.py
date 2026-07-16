@@ -6,7 +6,10 @@ from budget.sheets import fetch_cells, list_sheet_names
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-def make_service(sheet_titles: list[str] = None, batch_values: list = None) -> MagicMock:
+
+def make_service(
+    sheet_titles: list[str] = None, batch_values: list = None
+) -> MagicMock:
     """
     Build a minimal mock of the Google Sheets API service.
 
@@ -16,20 +19,24 @@ def make_service(sheet_titles: list[str] = None, batch_values: list = None) -> M
     service = MagicMock()
 
     # spreadsheets().get().execute()
-    sheets_meta = {"sheets": [{"properties": {"title": t}} for t in (sheet_titles or [])]}
-    service.spreadsheets.return_value.get.return_value.execute.return_value = sheets_meta
+    sheets_meta = {
+        "sheets": [{"properties": {"title": t}} for t in (sheet_titles or [])]
+    }
+    service.spreadsheets.return_value.get.return_value.execute.return_value = (
+        sheets_meta
+    )
 
     # spreadsheets().values().batchGet().execute()
     batch_result = {"valueRanges": batch_values or []}
-    (service.spreadsheets.return_value
-           .values.return_value
-           .batchGet.return_value
-           .execute.return_value) = batch_result
+    (
+        service.spreadsheets.return_value.values.return_value.batchGet.return_value.execute.return_value
+    ) = batch_result
 
     return service
 
 
 # ── list_sheet_names ───────────────────────────────────────────────────────────
+
 
 def test_list_sheet_names_returns_all_when_no_pattern():
     service = make_service(["January", "February", "Summary"])
@@ -65,6 +72,7 @@ def test_list_sheet_names_passes_spreadsheet_id():
 
 # ── fetch_cells ────────────────────────────────────────────────────────────────
 
+
 def _value_range(value: str | None):
     """Build a valueRanges entry as the API would return it."""
     if value is None:
@@ -73,10 +81,12 @@ def _value_range(value: str | None):
 
 
 def test_fetch_cells_returns_parsed_floats():
-    service = make_service(batch_values=[
-        _value_range("5000"),
-        _value_range("4000"),
-    ])
+    service = make_service(
+        batch_values=[
+            _value_range("5000"),
+            _value_range("4000"),
+        ]
+    )
     result = fetch_cells(service, "sid", "Sheet1", ["F4", "F5"])
     assert result == {"F4": 5000.0, "F5": 4000.0}
 
@@ -94,11 +104,13 @@ def test_fetch_cells_returns_none_for_empty_cell():
 
 
 def test_fetch_cells_mixed_present_and_empty():
-    service = make_service(batch_values=[
-        _value_range("100"),
-        _value_range(None),
-        _value_range("200"),
-    ])
+    service = make_service(
+        batch_values=[
+            _value_range("100"),
+            _value_range(None),
+            _value_range("200"),
+        ]
+    )
     result = fetch_cells(service, "sid", "Sheet1", ["A1", "A2", "A3"])
     assert result["A1"] == 100.0
     assert result["A2"] is None

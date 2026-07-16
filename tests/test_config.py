@@ -9,6 +9,7 @@ from budget.config import ConfigError, get_env, load_toml
 
 # ── get_env ────────────────────────────────────────────────────────────────────
 
+
 def test_get_env_returns_value_when_set():
     with patch.dict(os.environ, {"MY_KEY": "my_value"}):
         assert get_env("MY_KEY") == "my_value"
