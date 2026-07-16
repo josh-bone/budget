@@ -12,16 +12,17 @@ Run:
 
 import logging
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import quote, unquote
 
+from cache import budget_cache
 from dotenv import load_dotenv
 from flask import Flask, redirect, render_template, url_for
 
 from budget.analyze import build_budget
 from budget.config import ConfigError, get_env, load_toml
 from budget.sheets import build_service, fetch_cells, list_sheet_names
-from cache import budget_cache
 
 load_dotenv()
 
@@ -37,6 +38,7 @@ _MAX_WORKERS = int(os.environ.get("BUDGET_FETCH_WORKERS", 6))
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
 
 def _sort_key(sheet_name: str):
     """Sort 'M/YYYY' tab names chronologically."""
@@ -78,32 +80,39 @@ def load_all_months() -> dict[str, dict]:
     if cached is not None:
         return cached
 
-    key_file       = get_env("GOOGLE_SERVICE_ACCOUNT_KEY")
+    key_file = get_env("GOOGLE_SERVICE_ACCOUNT_KEY")
     spreadsheet_id = get_env("SPREADSHEET_ID")
-    config         = load_toml()
+    config = load_toml()
 
-    pattern        = config.get("spreadsheet", {}).get("sheet_pattern")
-    cells_config   = config.get("cells", {})
+    pattern = config.get("spreadsheet", {}).get("sheet_pattern")
+    cells_config = config.get("cells", {})
     summary_config = config.get("summary", {})
 
     if not cells_config:
         raise ConfigError("No [cells.*] sections found in config.toml")
 
-    all_refs = list(dict.fromkeys(
-        ref for labels in cells_config.values() for ref in labels.values()
-    ))
+    all_refs = list(
+        dict.fromkeys(
+            ref for labels in cells_config.values() for ref in labels.values()
+        )
+    )
 
-    service     = build_service(key_file)
+    service = build_service(key_file)
     sheet_names = list_sheet_names(service, spreadsheet_id, pattern=pattern)
     sheet_names.sort(key=_sort_key)
 
-    logger.info(f"Discovered {len(sheet_names)} sheet(s), fetching with {_MAX_WORKERS} workers...")
+    logger.info(
+        f"Discovered {len(sheet_names)} sheet(s), fetching with {_MAX_WORKERS} workers..."
+    )
 
     result: dict[str, dict] = {}
 
+    start_times = {}
     with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
-        futures = {
-            executor.submit(
+        futures = {}
+        for sheet in sheet_names:
+            start_times[sheet] = time.monotonic()
+            future = executor.submit(
                 _fetch_one,
                 service,
                 spreadsheet_id,
@@ -111,16 +120,21 @@ def load_all_months() -> dict[str, dict]:
                 all_refs,
                 cells_config,
                 summary_config,
-            ): sheet
-            for sheet in sheet_names
-        }
+            )
+            futures[future] = sheet
+
         for future in as_completed(futures):
             sheet = futures[future]
+            elapsed = time.monotonic() - start_times[sheet]
             try:
                 sheet_name, budget = future.result()
                 result[sheet_name] = budget
+                log_fn = logger.warning if elapsed > 5 else logger.info
+                log_fn(f"Fetched sheet '{sheet}' in {elapsed:.2f}s")
             except Exception as e:
-                logger.error(f"Failed to fetch sheet '{sheet}': {e}")
+                logger.error(
+                    f"Failed to fetch sheet '{sheet}' after {elapsed:.2f}s: {e}"
+                )
                 raise
 
     # Re-sort after parallel completion (arrival order is non-deterministic)
@@ -132,34 +146,35 @@ def load_all_months() -> dict[str, dict]:
 
 def build_trends(all_months: dict[str, dict]) -> dict:
     """Derive cross-month trend data from all loaded months."""
-    months   = list(all_months.keys())
-    income   = [all_months[m]["summary"].get("net_income")     for m in months]
-    expenses = [all_months[m]["summary"].get("total_expenses")  for m in months]
-    diff     = [all_months[m]["summary"].get("disposable")      for m in months]
+    months = list(all_months.keys())
+    income = [all_months[m]["summary"].get("net_income") for m in months]
+    expenses = [all_months[m]["summary"].get("total_expenses") for m in months]
+    diff = [all_months[m]["summary"].get("disposable") for m in months]
 
     def _sum(vals):
         return sum(v for v in vals if v is not None)
 
     return {
-        "months":         months,
-        "income":         income,
-        "expenses":       expenses,
-        "diff":           diff,
-        "total_income":   _sum(income),
+        "months": months,
+        "income": income,
+        "expenses": expenses,
+        "diff": diff,
+        "total_income": _sum(income),
         "total_expenses": _sum(expenses),
-        "avg_income":     _sum(income)   / len(months) if months else 0,
-        "avg_expenses":   _sum(expenses) / len(months) if months else 0,
+        "avg_income": _sum(income) / len(months) if months else 0,
+        "avg_expenses": _sum(expenses) / len(months) if months else 0,
     }
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
+
 
 @app.route("/")
 def index():
     error = all_months = trends = fetched_at = None
     try:
         all_months = load_all_months()
-        trends     = build_trends(all_months)
+        trends = build_trends(all_months)
         fetched_at = budget_cache.fetched_at
     except Exception as e:
         logger.exception("Failed to load budget")
