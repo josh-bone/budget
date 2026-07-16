@@ -1,11 +1,11 @@
 import pytest
+
 from budget.analyze import (
+    _evaluate_derived,
     build_budget,
     build_sections,
     build_summary,
-    _evaluate_derived,
 )
-
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
 
