@@ -17,6 +17,7 @@
 ### Fixed
 
 - Every balance snapshot was overwriting the last one.
+- Removed the nonfunctional Refresh button from the balances page.
 
 ## v0.1.0
 
