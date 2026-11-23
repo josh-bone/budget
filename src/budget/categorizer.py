@@ -20,7 +20,9 @@ def _matches(conditions: Mapping[str, Any], transaction: Mapping[str, Any]) -> b
             value = condition.get("value")
             if not isinstance(value, str) or not value:
                 return False
-            outcomes.append(value.casefold() in str(transaction.get("description") or "").casefold())
+            outcomes.append(
+                value.casefold() in str(transaction.get("description") or "").casefold()
+            )
         elif field == "amount" and operator == "between":
             try:
                 amount = float(transaction["amount"])
@@ -68,7 +70,15 @@ def categorize_unassigned(connection: sqlite3.Connection) -> int:
         "is_manual_category FROM transactions WHERE is_manual_category = 0"
     ).fetchall()
     changed = 0
-    for account_id, transaction_id, description, amount, old_category, old_rule, manual in rows:
+    for (
+        account_id,
+        transaction_id,
+        description,
+        amount,
+        old_category,
+        old_rule,
+        manual,
+    ) in rows:
         category_id, rule_id = categorize_transaction(
             connection,
             {

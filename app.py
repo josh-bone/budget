@@ -46,6 +46,7 @@ logger = logging.getLogger(__name__)
 def inject_instance_mode():
     return {"budget_staging": app.config["BUDGET_STAGING"]}
 
+
 # Legacy Sheets month-detail concurrency controls.
 _MAX_WORKERS = max(1, int(os.environ.get("BUDGET_FETCH_WORKERS", 6)))
 _RESULT_TIMEOUT = max(1, int(os.environ.get("BUDGET_RESULT_TIMEOUT", 20)))
@@ -189,7 +190,9 @@ def load_sqlite_monthly_trends() -> dict:
                       SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END) AS expenses
                FROM transactions t LEFT JOIN categories c ON c.id=t.category_id
                WHERE COALESCE(t.posted_date, t.transacted_at) IS NOT NULL
-                 AND t.pending = 0 AND """ + _non_transfer_clause("t") + """
+                 AND t.pending = 0 AND """
+            + _non_transfer_clause("t")
+            + """
                GROUP BY month ORDER BY month"""
         ).fetchall()
     finally:
@@ -363,7 +366,8 @@ def rules():
                ORDER BY r.priority, r.id"""
         ).fetchall()
         transfer_categories = {
-            row[0] for row in connection.execute(
+            row[0]
+            for row in connection.execute(
                 "SELECT id FROM categories WHERE is_transfer=1"
             ).fetchall()
         }
@@ -427,12 +431,20 @@ def create_category():
     else:
         connection = _connect()
         try:
-            connection.execute("INSERT INTO categories(name, parent_id) VALUES (?, ?)", (name, parent_id))
+            connection.execute(
+                "INSERT INTO categories(name, parent_id) VALUES (?, ?)",
+                (name, parent_id),
+            )
             connection.commit()
             flash(f"Added category {name}.", "success")
         except sqlite3.IntegrityError as exc:
             connection.rollback()
-            flash(f"Category {name} already exists." if "UNIQUE" in str(exc) else "Subcategories can only be added to top-level categories.", "error")
+            flash(
+                f"Category {name} already exists."
+                if "UNIQUE" in str(exc)
+                else "Subcategories can only be added to top-level categories.",
+                "error",
+            )
         finally:
             connection.close()
     return redirect(url_for("rules"))
@@ -487,7 +499,9 @@ def reparent_category(category_id):
         parent_id = int(raw_parent) if raw_parent else None
         connection = _connect()
         try:
-            connection.execute("UPDATE categories SET parent_id=? WHERE id=?", (parent_id, category_id))
+            connection.execute(
+                "UPDATE categories SET parent_id=? WHERE id=?", (parent_id, category_id)
+            )
             connection.commit()
             flash("Category moved.", "success")
         finally:
@@ -501,7 +515,9 @@ def reparent_category(category_id):
 def delete_category(category_id):
     connection = _connect()
     try:
-        if connection.execute("SELECT 1 FROM categories WHERE parent_id=? LIMIT 1", (category_id,)).fetchone():
+        if connection.execute(
+            "SELECT 1 FROM categories WHERE parent_id=? LIMIT 1", (category_id,)
+        ).fetchone():
             flash("Category has subcategories.", "error")
             return redirect(url_for("rules"))
         referenced = connection.execute(
@@ -535,7 +551,12 @@ def _save_rule(rule_id=None):
         if match_field == "amount":
             minimum, maximum = float(minimum_raw), float(maximum_raw)
             if minimum <= maximum:
-                condition = {"field": "amount", "operator": "between", "minimum": minimum, "maximum": maximum}
+                condition = {
+                    "field": "amount",
+                    "operator": "between",
+                    "minimum": minimum,
+                    "maximum": maximum,
+                }
         elif match_field == "description" and value:
             condition = {"field": "description", "operator": "contains", "value": value}
     except ValueError:
@@ -633,7 +654,9 @@ def transactions():
     except ValueError:
         page = 1
     account_id = request.args.get("account_id", "").strip()
-    category_ids = [value.strip() for value in request.args.getlist("category_id") if value.strip()]
+    category_ids = [
+        value.strip() for value in request.args.getlist("category_id") if value.strip()
+    ]
     owner = request.args.get("owner", "").strip()
     pending = request.args.get("pending", "").strip()
     query = request.args.get("q", "").strip()
@@ -664,7 +687,13 @@ def transactions():
             continue
     if selected_category_ids:
         placeholders = ",".join("?" for _ in selected_category_ids)
-        category_filter_clauses.append("t.category_id IN (SELECT id FROM categories WHERE id IN (" + placeholders + ") OR parent_id IN (" + placeholders + "))")
+        category_filter_clauses.append(
+            "t.category_id IN (SELECT id FROM categories WHERE id IN ("
+            + placeholders
+            + ") OR parent_id IN ("
+            + placeholders
+            + "))"
+        )
         values.extend(selected_category_ids * 2)
     if category_filter_clauses:
         clauses.append("(" + " OR ".join(category_filter_clauses) + ")")
@@ -701,7 +730,9 @@ def transactions():
         date_clauses.append("COALESCE(t.posted_date, t.transacted_at) <= ?")
         values.append(end_date)
     elif selected_month and not has_date_range:
-        date_clauses.append("substr(COALESCE(t.posted_date, t.transacted_at), 1, 7) = ?")
+        date_clauses.append(
+            "substr(COALESCE(t.posted_date, t.transacted_at), 1, 7) = ?"
+        )
         values.append(selected_month)
     clauses.extend(date_clauses)
     if has_date_range:
@@ -713,7 +744,9 @@ def transactions():
     connection = _connect()
     try:
         total = connection.execute(
-            "SELECT COUNT(*) FROM transactions t JOIN accounts a ON a.id=t.account_id LEFT JOIN account_owners ao ON ao.account_id=a.id" + where, values
+            "SELECT COUNT(*) FROM transactions t JOIN accounts a ON a.id=t.account_id LEFT JOIN account_owners ao ON ao.account_id=a.id"
+            + where,
+            values,
         ).fetchone()[0]
         rows = connection.execute(
             """SELECT t.account_id, t.transaction_id, COALESCE(t.posted_date, t.transacted_at),
@@ -723,14 +756,27 @@ def transactions():
                FROM transactions t JOIN accounts a ON a.id=t.account_id LEFT JOIN account_owners ao ON ao.account_id=a.id
                LEFT JOIN categories c ON c.id=t.category_id LEFT JOIN categories parent ON parent.id=c.parent_id"""
             + where
-            + (" ORDER BY t.amount " + order.upper() + ", COALESCE(t.posted_date, t.transacted_at) DESC, t.rowid DESC" if sort == "amount" else " ORDER BY COALESCE(t.posted_date, t.transacted_at) " + order.upper() + ", t.rowid DESC")
+            + (
+                " ORDER BY t.amount "
+                + order.upper()
+                + ", COALESCE(t.posted_date, t.transacted_at) DESC, t.rowid DESC"
+                if sort == "amount"
+                else " ORDER BY COALESCE(t.posted_date, t.transacted_at) "
+                + order.upper()
+                + ", t.rowid DESC"
+            )
             + " LIMIT ? OFFSET ?",
             [*values, per_page, (page - 1) * per_page],
         ).fetchall()
         accounts = connection.execute(
             "SELECT id, name FROM accounts ORDER BY name COLLATE NOCASE"
         ).fetchall()
-        owners = [row[0] for row in connection.execute("SELECT DISTINCT owner FROM account_owners ORDER BY owner COLLATE NOCASE").fetchall()]
+        owners = [
+            row[0]
+            for row in connection.execute(
+                "SELECT DISTINCT owner FROM account_owners ORDER BY owner COLLATE NOCASE"
+            ).fetchall()
+        ]
         categories = _category_options(connection)
         chart_categories = _category_options(connection, exclude_transfers=True)
         months = [
@@ -749,7 +795,12 @@ def transactions():
             "SELECT COALESCE(" + category_expr + ", 'Uncategorized'), SUM(-t.amount) "
             "FROM transactions t JOIN accounts a ON a.id=t.account_id LEFT JOIN account_owners ao ON ao.account_id=a.id LEFT JOIN categories c ON c.id=t.category_id LEFT JOIN categories parent ON parent.id=c.parent_id WHERE t.amount < 0"
             + ((" AND " + " AND ".join(chart_clauses)) if chart_clauses else "")
-            + (" GROUP BY COALESCE(parent.id, c.id), COALESCE(parent.name, c.name)" if rollup else " GROUP BY t.category_id, c.name") + " ORDER BY 2 DESC",
+            + (
+                " GROUP BY COALESCE(parent.id, c.id), COALESCE(parent.name, c.name)"
+                if rollup
+                else " GROUP BY t.category_id, c.name"
+            )
+            + " ORDER BY 2 DESC",
             chart_values,
         ).fetchall()
     finally:
@@ -879,7 +930,13 @@ def transaction_spend():
                 continue
     if category_ids:
         placeholders = ",".join("?" for _ in category_ids)
-        category_clauses.append("t.category_id IN (SELECT id FROM categories WHERE id IN (" + placeholders + ") OR parent_id IN (" + placeholders + "))")
+        category_clauses.append(
+            "t.category_id IN (SELECT id FROM categories WHERE id IN ("
+            + placeholders
+            + ") OR parent_id IN ("
+            + placeholders
+            + "))"
+        )
         values.extend(category_ids * 2)
     if category_clauses:
         clauses.append("(" + " OR ".join(category_clauses) + ")")
@@ -889,16 +946,41 @@ def transaction_spend():
         rows = connection.execute(
             "SELECT COALESCE(" + category_expr + ", 'Uncategorized'), SUM(-t.amount) "
             "FROM transactions t JOIN accounts a ON a.id=t.account_id LEFT JOIN account_owners ao ON ao.account_id=a.id LEFT JOIN categories c ON c.id=t.category_id LEFT JOIN categories parent ON parent.id=c.parent_id "
-            "WHERE t.amount < 0 AND " + " AND ".join(clauses) +
-            (" GROUP BY COALESCE(parent.id, c.id), COALESCE(parent.name, c.name)" if rollup else " GROUP BY t.category_id, c.name") + " ORDER BY 1 COLLATE NOCASE", values
+            "WHERE t.amount < 0 AND "
+            + " AND ".join(clauses)
+            + (
+                " GROUP BY COALESCE(parent.id, c.id), COALESCE(parent.name, c.name)"
+                if rollup
+                else " GROUP BY t.category_id, c.name"
+            )
+            + " ORDER BY 1 COLLATE NOCASE",
+            values,
         ).fetchall()
     finally:
         connection.close()
-    palette = ["#4778a8", "#e08b45", "#65a36e", "#b65d5d", "#8a70ad", "#c5a537", "#4b9b9a", "#ce719b", "#7d8791", "#9b704d"]
+    palette = [
+        "#4778a8",
+        "#e08b45",
+        "#65a36e",
+        "#b65d5d",
+        "#8a70ad",
+        "#c5a537",
+        "#4b9b9a",
+        "#ce719b",
+        "#7d8791",
+        "#9b704d",
+    ]
     total = sum(float(amount) for _, amount in rows)
     breakdown = [
-        {"name": name, "amount": float(amount), "percent": float(amount) / total * 100 if total else 0, "color": palette[index % len(palette)]}
-        for index, (name, amount) in enumerate(sorted(rows, key=lambda row: row[1], reverse=True))
+        {
+            "name": name,
+            "amount": float(amount),
+            "percent": float(amount) / total * 100 if total else 0,
+            "color": palette[index % len(palette)],
+        }
+        for index, (name, amount) in enumerate(
+            sorted(rows, key=lambda row: row[1], reverse=True)
+        )
     ]
     return jsonify({"total": total, "breakdown": breakdown})
 
@@ -969,7 +1051,14 @@ def _transfer_form_pair(connection):
         "account_id": request.form.get("candidate_account_id", ""),
         "transaction_id": request.form.get("candidate_transaction_id", ""),
     }
-    if not all((source["account_id"], source["transaction_id"], candidate["account_id"], candidate["transaction_id"])):
+    if not all(
+        (
+            source["account_id"],
+            source["transaction_id"],
+            candidate["account_id"],
+            candidate["transaction_id"],
+        )
+    ):
         return None, None
     return source, candidate
 
@@ -979,7 +1068,10 @@ def approve_transfer():
     connection = _connect()
     try:
         source, candidate = _transfer_form_pair(connection)
-        if source is None or _posted_transfer_suggestion(connection, source, candidate) is None:
+        if (
+            source is None
+            or _posted_transfer_suggestion(connection, source, candidate) is None
+        ):
             flash("That transfer suggestion is no longer available.", "error")
             return redirect(url_for("transfers"))
         try:
@@ -1002,7 +1094,9 @@ def approve_transfer():
             )
             if cursor.rowcount != 1:
                 connection.rollback()
-                flash("That transfer suggestion changed. Please review it again.", "error")
+                flash(
+                    "That transfer suggestion changed. Please review it again.", "error"
+                )
                 return redirect(url_for("transfers"))
         connection.commit()
         flash("Transfer approved and categorized.", "success")
@@ -1016,11 +1110,14 @@ def reject_transfer():
     connection = _connect()
     try:
         source, candidate = _transfer_form_pair(connection)
-        if source is None or _posted_transfer_suggestion(connection, source, candidate) is None:
+        if (
+            source is None
+            or _posted_transfer_suggestion(connection, source, candidate) is None
+        ):
             flash("That transfer suggestion is no longer available.", "error")
             return redirect(url_for("transfers"))
-        account_id_a, transaction_id_a, account_id_b, transaction_id_b = transfer_pair_key(
-            source, candidate
+        account_id_a, transaction_id_a, account_id_b, transaction_id_b = (
+            transfer_pair_key(source, candidate)
         )
         connection.execute(
             """INSERT OR IGNORE INTO transfer_rejections
@@ -1092,7 +1189,10 @@ def update_transaction_category(account_id, transaction_id):
                     "SELECT 1 FROM categories WHERE id=?", (category_id,)
                 ).fetchone()
             ):
-                if request.is_json or request.headers.get("X-Requested-With") == "fetch":
+                if (
+                    request.is_json
+                    or request.headers.get("X-Requested-With") == "fetch"
+                ):
                     return jsonify({"error": "Choose a valid category."}), 400
                 flash("Choose a valid category.", "error")
             else:
@@ -1131,7 +1231,13 @@ def update_transaction_category(account_id, transaction_id):
     finally:
         connection.close()
     if request.is_json or request.headers.get("X-Requested-With") == "fetch":
-        return jsonify({"category_id": updated[0], "category": updated[1], "manual": bool(updated[2])})
+        return jsonify(
+            {
+                "category_id": updated[0],
+                "category": updated[1],
+                "manual": bool(updated[2]),
+            }
+        )
     return_to = request.form.get("return_to", "")
     if not return_to.startswith("/") or return_to.startswith("//"):
         return_to = url_for("transactions")

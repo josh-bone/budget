@@ -59,7 +59,12 @@ def _seed(monkeypatch, tmp_path):
     return transfer_id, other_transfer_id, auto_id
 
 
-def _pair_form(source_account="a", source_transaction="out", candidate_account="b", candidate_transaction="in"):
+def _pair_form(
+    source_account="a",
+    source_transaction="out",
+    candidate_account="b",
+    candidate_transaction="in",
+):
     return {
         "source_account_id": source_account,
         "source_transaction_id": source_transaction,
@@ -110,9 +115,14 @@ def test_reject_persists_pair_and_prevents_resent_suggestion(monkeypatch, tmp_pa
     assert response.status_code == 302
     connection = _connect()
     assert suggest_transfer_pairs(connection) == []
-    assert connection.execute("SELECT COUNT(*) FROM transfer_rejections").fetchone()[0] == 1
+    assert (
+        connection.execute("SELECT COUNT(*) FROM transfer_rejections").fetchone()[0]
+        == 1
+    )
     connection.close()
-    assert "No transfer pairs need review" in client.get("/transfers").get_data(as_text=True)
+    assert "No transfer pairs need review" in client.get("/transfers").get_data(
+        as_text=True
+    )
 
 
 def test_unmark_returns_transaction_to_rule_categorization(monkeypatch, tmp_path):
@@ -172,10 +182,13 @@ def test_child_of_transfer_category_can_be_selected_for_approval(monkeypatch, tm
 
     assert response.status_code == 302
     connection = _connect()
-    assert connection.execute(
-        "SELECT COUNT(*) FROM transactions WHERE category_id=? AND is_manual_category=1",
-        (child_id,),
-    ).fetchone()[0] == 2
+    assert (
+        connection.execute(
+            "SELECT COUNT(*) FROM transactions WHERE category_id=? AND is_manual_category=1",
+            (child_id,),
+        ).fetchone()[0]
+        == 2
+    )
     connection.close()
 
 

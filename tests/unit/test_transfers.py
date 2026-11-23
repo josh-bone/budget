@@ -105,9 +105,7 @@ def test_includes_window_boundary_but_excludes_outside_it(tmp_path):
     pairs = suggest_transfer_pairs(connection)
 
     assert TRANSFER_MATCH_WINDOW_DAYS == 10
-    assert [pair["candidate"]["transaction_id"] for pair in pairs] == [
-        "in-boundary"
-    ]
+    assert [pair["candidate"]["transaction_id"] for pair in pairs] == ["in-boundary"]
     connection.close()
 
 
@@ -122,9 +120,9 @@ def test_excludes_manually_categorized_and_pending_transactions(tmp_path):
 
     pairs = suggest_transfer_pairs(connection)
 
-    assert [(p["source"]["transaction_id"], p["candidate"]["transaction_id"]) for p in pairs] == [
-        ("eligible-out", "eligible-in")
-    ]
+    assert [
+        (p["source"]["transaction_id"], p["candidate"]["transaction_id"]) for p in pairs
+    ] == [("eligible-out", "eligible-in")]
     connection.close()
 
 

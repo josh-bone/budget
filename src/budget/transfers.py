@@ -59,7 +59,8 @@ def suggest_transfer_pairs(
     for row in rows:
         transaction_date = date.fromisoformat(row[3])
         amount_cents = int(
-            abs(Decimal(str(row[4]))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) * 100
+            abs(Decimal(str(row[4]))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            * 100
         )
         if amount_cents == 0:
             continue
@@ -83,8 +84,7 @@ def suggest_transfer_pairs(
         )
 
     pair_buckets = {
-        key: [day for day, _ in bucket]
-        for key, bucket in by_amount_and_sign.items()
+        key: [day for day, _ in bucket] for key, bucket in by_amount_and_sign.items()
     }
     pairs = []
     for source_index, source in enumerate(records):
@@ -99,7 +99,9 @@ def suggest_transfer_pairs(
             candidate = records[candidate_index]
             if source["account_id"] == candidate["account_id"]:
                 continue
-            debit, credit = (source, candidate) if source["_sign"] < 0 else (candidate, source)
+            debit, credit = (
+                (source, candidate) if source["_sign"] < 0 else (candidate, source)
+            )
             debit_public = {
                 key: value for key, value in debit.items() if not key.startswith("_")
             }

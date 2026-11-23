@@ -14,7 +14,9 @@ def _seed_transfer_data(monkeypatch, tmp_path):
     connection = _connect()
     connection.execute("INSERT INTO accounts(id, name) VALUES ('checking', 'Checking')")
     connection.execute("INSERT INTO accounts(id, name) VALUES ('savings', 'Savings')")
-    connection.execute("INSERT INTO categories(name, is_transfer) VALUES ('Transfer', 1)")
+    connection.execute(
+        "INSERT INTO categories(name, is_transfer) VALUES ('Transfer', 1)"
+    )
     transfer_id = connection.execute(
         "SELECT id FROM categories WHERE name='Transfer'"
     ).fetchone()[0]
@@ -26,10 +28,10 @@ def _seed_transfer_data(monkeypatch, tmp_path):
         """INSERT INTO transactions(account_id, transaction_id, posted_date, amount,
                   description, category_id) VALUES (?, ?, '2026-05-10', ?, ?, ?)""",
         [
-            ('checking', 'transfer-out', -40, 'Move to savings', transfer_id),
-            ('savings', 'transfer-in', 40, 'Move from checking', transfer_id),
-            ('checking', 'food', -20, 'Groceries', food_id),
-            ('checking', 'income', 100, 'Paycheck', None),
+            ("checking", "transfer-out", -40, "Move to savings", transfer_id),
+            ("savings", "transfer-in", 40, "Move from checking", transfer_id),
+            ("checking", "food", -20, "Groceries", food_id),
+            ("checking", "income", 100, "Paycheck", None),
         ],
     )
     connection.commit()
@@ -95,12 +97,17 @@ def test_transfer_flag_controls_category_ui(monkeypatch, tmp_path):
     response = client.get("/transactions")
     html = response.get_data(as_text=True)
     assert f'value="{transfer_id}"' in html  # editable category selector
-    assert not re.search(r'<label><input type="checkbox" class="cat-cb" name="category_id" value="' + str(transfer_id), html)
+    assert not re.search(
+        r'<label><input type="checkbox" class="cat-cb" name="category_id" value="'
+        + str(transfer_id),
+        html,
+    )
 
     client.post(f"/categories/{transfer_id}/transfer", data={"is_transfer": "0"})
     response = client.get("/transactions")
     assert re.search(
-        r'<label><input type="checkbox" class="cat-cb" name="category_id" value="' + str(transfer_id),
+        r'<label><input type="checkbox" class="cat-cb" name="category_id" value="'
+        + str(transfer_id),
         response.get_data(as_text=True),
     )
 
@@ -161,7 +168,10 @@ def test_child_of_transfer_category_inherits_transfer_behavior(monkeypatch, tmp_
     assert "2 transactions" in page
     assert "Move to savings" not in page
     assert "Credit Card Payment" in shown
-    assert "Credit Card Payment" not in page.split('id="catDropdown"', 1)[1].split("</details>", 1)[0]
+    assert (
+        "Credit Card Payment"
+        not in page.split('id="catDropdown"', 1)[1].split("</details>", 1)[0]
+    )
     assert client.get("/api/transactions/spend").get_json()["total"] == 20
     assert load_sqlite_monthly_trends()["total_expenses"] == 20
     assert b"Transfer via parent" in client.get("/rules").data

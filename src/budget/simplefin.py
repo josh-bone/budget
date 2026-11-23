@@ -39,9 +39,7 @@ def _daily_request_limit() -> int:
             "SIMPLEFIN_DAILY_REQUEST_LIMIT must be a positive integer"
         ) from None
     if limit < 1:
-        raise SimpleFINError(
-            "SIMPLEFIN_DAILY_REQUEST_LIMIT must be a positive integer"
-        )
+        raise SimpleFINError("SIMPLEFIN_DAILY_REQUEST_LIMIT must be a positive integer")
     return limit
 
 
@@ -264,7 +262,9 @@ def get_transactions(
                 account_id = account["id"]
                 display_name = account_names.get(account_id)
                 if display_name is None:
-                    logger.warning("Skipping unmapped SimpleFIN account id %s", account_id)
+                    logger.warning(
+                        "Skipping unmapped SimpleFIN account id %s", account_id
+                    )
                     continue
                 transactions = account.get("transactions", [])
                 if not isinstance(transactions, list):

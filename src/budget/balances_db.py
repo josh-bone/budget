@@ -57,7 +57,9 @@ def _connect(db_path: str | os.PathLike[str] | None = None) -> sqlite3.Connectio
         account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON UPDATE CASCADE ON DELETE CASCADE,
         owner TEXT NOT NULL
     )""")
-    account_columns = {row[1] for row in connection.execute("PRAGMA table_info(accounts)")}
+    account_columns = {
+        row[1] for row in connection.execute("PRAGMA table_info(accounts)")
+    }
     if "owner" in account_columns:
         connection.execute(
             """INSERT OR IGNORE INTO account_owners (account_id, owner)
@@ -100,11 +102,17 @@ def _connect(db_path: str | os.PathLike[str] | None = None) -> sqlite3.Connectio
         name TEXT NOT NULL UNIQUE COLLATE NOCASE,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )""")
-    category_columns = {row[1] for row in connection.execute("PRAGMA table_info(categories)")}
+    category_columns = {
+        row[1] for row in connection.execute("PRAGMA table_info(categories)")
+    }
     if "parent_id" not in category_columns:
-        connection.execute("ALTER TABLE categories ADD COLUMN parent_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT")
+        connection.execute(
+            "ALTER TABLE categories ADD COLUMN parent_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT"
+        )
     if "is_transfer" not in category_columns:
-        connection.execute("ALTER TABLE categories ADD COLUMN is_transfer INTEGER NOT NULL DEFAULT 0")
+        connection.execute(
+            "ALTER TABLE categories ADD COLUMN is_transfer INTEGER NOT NULL DEFAULT 0"
+        )
     if schema_version < 7:
         # Transfer categories may already exist under either common spelling.
         connection.execute(

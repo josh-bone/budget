@@ -37,10 +37,13 @@ def test_simplefin_claim_prints_access_url_and_private_storage_instruction(
 
 def test_simplefin_requires_configured_access_url(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["budget", "simplefin"])
-    with patch(
-        "budget.cli.get_accounts",
-        side_effect=ConfigError("missing SIMPLEFIN_ACCESS_URL"),
-    ), pytest.raises(ConfigError, match="SIMPLEFIN_ACCESS_URL"):
+    with (
+        patch(
+            "budget.cli.get_accounts",
+            side_effect=ConfigError("missing SIMPLEFIN_ACCESS_URL"),
+        ),
+        pytest.raises(ConfigError, match="SIMPLEFIN_ACCESS_URL"),
+    ):
         main()
 
 
@@ -72,11 +75,14 @@ def test_simplefin_displays_balances_and_raw_ids(monkeypatch, capsys):
 
 
 def test_transactions_command_saves_rows(monkeypatch, capsys):
-    monkeypatch.setattr(sys, "argv", ["budget", "transactions", "--start-date", "2024-01-01"])
+    monkeypatch.setattr(
+        sys, "argv", ["budget", "transactions", "--start-date", "2024-01-01"]
+    )
     rows = [{"id": "a1"}]
-    with patch("budget.cli.get_transactions", return_value=rows) as fetch, patch(
-        "budget.cli.insert_simplefin_transactions", return_value=4
-    ) as insert:
+    with (
+        patch("budget.cli.get_transactions", return_value=rows) as fetch,
+        patch("budget.cli.insert_simplefin_transactions", return_value=4) as insert,
+    ):
         main()
     fetch.assert_called_once_with(start_date="2024-01-01", end_date=None)
     insert.assert_called_once_with(rows)
@@ -85,9 +91,11 @@ def test_transactions_command_saves_rows(monkeypatch, capsys):
 
 def test_import_balances_command(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["budget", "import-balances"])
-    with patch("budget.cli.get_env", side_effect=["key", "sheet"]), \
-         patch("budget.cli.build_service", return_value=object()), \
-         patch("budget.cli.get_balances_df", return_value="balances"), \
-         patch("budget.cli.import_balance_history", return_value=(2, 1)) as importer:
+    with (
+        patch("budget.cli.get_env", side_effect=["key", "sheet"]),
+        patch("budget.cli.build_service", return_value=object()),
+        patch("budget.cli.get_balances_df", return_value="balances"),
+        patch("budget.cli.import_balance_history", return_value=(2, 1)) as importer,
+    ):
         main()
     importer.assert_called_once_with("balances")
