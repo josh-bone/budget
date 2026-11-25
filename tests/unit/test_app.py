@@ -43,7 +43,7 @@ def test_month_detail_renders_requested_budget(monkeypatch):
                 "summary": {
                     "net_income": 4000,
                     "total_expenses": 1700,
-                    "diff": 2300,
+                    "disposable": 2300,
                 },
                 "income": [{"label": "net_income", "cell": "F5", "value": 4000}],
             }
@@ -54,6 +54,22 @@ def test_month_detail_renders_requested_budget(monkeypatch):
 
     assert response.status_code == 200
     assert b"1/2026" in response.data
+    assert b"$2300.00" in response.data
+
+
+def test_month_detail_renders_missing_summary_fields(monkeypatch):
+    monkeypatch.setattr(
+        web_app,
+        "load_all_months",
+        lambda: {"1/2026": {"summary": {"total_expenses": 1700}}},
+    )
+    monkeypatch.setitem(web_app.app.config, "TESTING", True)
+
+    response = web_app.app.test_client().get("/month/1/2026")
+
+    assert response.status_code == 200
+    assert b"$1700.00" in response.data
+    assert response.data.count("—".encode()) == 2
 
 
 def test_month_detail_logs_loader_failure(caplog, monkeypatch):

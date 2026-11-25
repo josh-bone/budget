@@ -183,23 +183,26 @@
   {% elif budget %}
 
     {% set s = budget.get('summary', {}) %}
+    {% set net_income = s.get('net_income') %}
+    {% set total_expenses = s.get('total_expenses') %}
+    {% set disposable = s.get('disposable') %}
     <div class="summary">
       <div class="summary-cell">
         <span class="summary-label">Net Income</span>
         <span class="summary-value">
-          {% if s.net_income is not none %}${{ "%.2f"|format(s.net_income) }}{% else %}—{% endif %}
+          {% if net_income is not none %}${{ "%.2f"|format(net_income) }}{% else %}—{% endif %}
         </span>
       </div>
       <div class="summary-cell">
         <span class="summary-label">Total Expenses</span>
         <span class="summary-value">
-          {% if s.total_expenses is not none %}${{ "%.2f"|format(s.total_expenses) }}{% else %}—{% endif %}
+          {% if total_expenses is not none %}${{ "%.2f"|format(total_expenses) }}{% else %}—{% endif %}
         </span>
       </div>
       <div class="summary-cell">
         <span class="summary-label">Remaining</span>
-        <span class="summary-value {% if s.diff is not none %}{% if s.diff >= 0 %}positive{% else %}negative{% endif %}{% endif %}">
-          {% if s.diff is not none %}${{ "%.2f"|format(s.diff) }}{% else %}—{% endif %}
+        <span class="summary-value {% if disposable is not none %}{% if disposable >= 0 %}positive{% else %}negative{% endif %}{% endif %}">
+          {% if disposable is not none %}${{ "%.2f"|format(disposable) }}{% else %}—{% endif %}
         </span>
       </div>
     </div>
