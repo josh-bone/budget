@@ -1,6 +1,8 @@
 import importlib.util
 from pathlib import Path
 
+import pandas as pd
+
 _APP_PATH = Path(__file__).resolve().parents[2] / "app.py"
 _APP_SPEC = importlib.util.spec_from_file_location("budget_web_app", _APP_PATH)
 assert _APP_SPEC is not None and _APP_SPEC.loader is not None
@@ -67,6 +69,22 @@ def test_month_detail_logs_loader_failure(caplog, monkeypatch):
     assert response.status_code == 200
     assert b"Sheets unavailable" in response.data
     assert "Failed to load budget" in caplog.text
+
+
+def test_balances_shows_saved_snapshots_without_a_refresh_action(monkeypatch):
+    history = pd.DataFrame(
+        [
+            {"Account": "Checking", "Amount": 42.00, "Date": "2026-01-02", "Source": "manual"},
+            {"Account": "Savings", "Amount": 76.00, "Date": "2026-01-03", "Source": "simplefin"},
+        ]
+    )
+    monkeypatch.setattr(web_app, "get_balance_history", lambda: history)
+    response = web_app.app.test_client().get("/balances?source=manual")
+
+    assert response.status_code == 200
+    assert b"Checking" in response.data
+    assert b"Savings" not in response.data
+    assert b'action="/refresh"' not in response.data
 
 
 def test_refresh_redirects_to_balances():
