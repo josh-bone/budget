@@ -27,6 +27,7 @@ from budget.categorizer import categorize_transaction, recategorize_all
 from budget.config import ConfigError, get_env, load_toml
 from budget.sheets import build_service, fetch_cells, list_sheet_names
 from budget.transfers import suggest_transfer_pairs, transfer_pair_key
+from budget.utils import month_sheet_sort_key as _sort_key
 
 load_dotenv()
 
@@ -53,15 +54,6 @@ _RESULT_TIMEOUT = max(1, int(os.environ.get("BUDGET_RESULT_TIMEOUT", 20)))
 app.jinja_env.filters["urlencode"] = quote
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-
-
-def _sort_key(sheet_name: str):
-    """Sort 'M/YYYY' tab names chronologically."""
-    try:
-        parts = sheet_name.split("/")
-        return (int(parts[1]), int(parts[0]))
-    except (IndexError, ValueError):
-        return (0, 0)
 
 
 # The functions below are retained for the CLI and the legacy month-detail

@@ -25,6 +25,7 @@ from budget.sheets import (
     list_sheet_names,
 )
 from budget.simplefin import claim_setup_token, get_accounts, get_transactions
+from budget.utils import month_sheet_sort_key
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +226,7 @@ def main():
 
         service: Resource = build_service(key_file)
         sheet_names = list_sheet_names(service, spreadsheet_id, pattern=sheet_pattern)
-        sheet_names.sort()
+        sheet_names.sort(key=month_sheet_sort_key)
         latest_sheet = sheet_names[-1] if sheet_names else None
         latest_budget = None
         if latest_sheet and cells_config:
