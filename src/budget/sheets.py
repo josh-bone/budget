@@ -2,7 +2,6 @@
 sheets.py — Google Sheets access layer.
 """
 
-import os
 import re
 
 import httplib2
@@ -10,6 +9,7 @@ import pandas as pd
 from google_auth_httplib2 import AuthorizedHttp
 from pandas.api.types import is_string_dtype
 
+from budget.config import get_fetch_timeout
 from budget.utils import cast_to_float
 
 try:
@@ -20,14 +20,12 @@ except ImportError:
         "Missing dependencies. Run:\n"
         "  pip install google-auth google-auth-httplib2 google-api-python-client"
     )
-_FETCH_TIMEOUT = int(
-    os.environ.get("BUDGET_FETCH_TIMEOUT", 15)
-)  # per-request socket timeout (seconds)
-
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 
 
-def build_service(key_file: str, timeout: int = 15) -> Resource:
+def build_service(key_file: str, timeout: int | None = None) -> Resource:
+    if timeout is None:
+        timeout = get_fetch_timeout()
     creds = service_account.Credentials.from_service_account_file(
         key_file, scopes=SCOPES
     )

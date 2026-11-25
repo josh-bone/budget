@@ -20,9 +20,8 @@ from urllib.parse import urlsplit, urlunsplit
 import requests
 
 from budget.balances_db import reserve_simplefin_request
-from budget.config import get_env, load_toml
+from budget.config import get_env, get_fetch_timeout, load_toml
 
-_FETCH_TIMEOUT = int(os.environ.get("BUDGET_FETCH_TIMEOUT", 15))
 _DEFAULT_DAILY_REQUEST_LIMIT = 24
 logger = logging.getLogger(__name__)
 
@@ -75,7 +74,7 @@ def claim_setup_token(setup_token: str) -> str:
 
     try:
         response = requests.post(
-            claim_url, timeout=_FETCH_TIMEOUT, allow_redirects=False
+            claim_url, timeout=get_fetch_timeout(), allow_redirects=False
         )
         response.raise_for_status()
         access_url = response.text.strip()
@@ -121,7 +120,7 @@ def get_accounts(
         response = requests.get(
             endpoint,
             params={"balances-only": 1},
-            timeout=_FETCH_TIMEOUT,
+            timeout=get_fetch_timeout(),
             allow_redirects=False,
         )
         response.raise_for_status()
@@ -242,7 +241,7 @@ def get_transactions(
                 "end-date": int(datetime.combine(chunk_end, time.min, UTC).timestamp()),
             }
             response = requests.get(
-                endpoint, params=params, timeout=_FETCH_TIMEOUT, allow_redirects=False
+                endpoint, params=params, timeout=get_fetch_timeout(), allow_redirects=False
             )
             response.raise_for_status()
             payload = response.json()

@@ -1,9 +1,24 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 
-from budget.sheets import fetch_cells, get_balances_df, list_sheet_names
+from budget.sheets import build_service, fetch_cells, get_balances_df, list_sheet_names
+
+
+def test_build_service_reads_timeout_at_call_time(monkeypatch):
+    monkeypatch.setenv("BUDGET_FETCH_TIMEOUT", "37")
+    with (
+        patch("budget.sheets.service_account.Credentials.from_service_account_file"),
+        patch("budget.sheets.httplib2.Http") as http,
+        patch("budget.sheets.AuthorizedHttp"),
+        patch("budget.sheets.build"),
+    ):
+        build_service("unused.json")
+        http.assert_called_once_with(timeout=37)
+        http.reset_mock()
+        build_service("unused.json", timeout=8)
+        http.assert_called_once_with(timeout=8)
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 

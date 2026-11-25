@@ -19,6 +19,11 @@ def get_env(key: str) -> str:
     return value
 
 
+def get_fetch_timeout() -> int:
+    """Read the per-request timeout after the caller has loaded configuration."""
+    return int(os.environ.get("BUDGET_FETCH_TIMEOUT", "15"))
+
+
 def load_toml() -> dict[str, Any]:
     config_path_str = os.environ.get("BUDGET_CONFIG")
     if config_path_str is None:

@@ -25,7 +25,8 @@ def response(*, text="", payload=None):
     return result
 
 
-def test_claim_setup_token_posts_decoded_claim_url():
+def test_claim_setup_token_posts_decoded_claim_url(monkeypatch):
+    monkeypatch.setenv("BUDGET_FETCH_TIMEOUT", "31")
     token = base64.b64encode(b"https://bridge.example/claim/once").decode()
     with patch(
         "budget.simplefin.requests.post",
@@ -33,11 +34,12 @@ def test_claim_setup_token_posts_decoded_claim_url():
     ) as post:
         assert claim_setup_token(token) == "https://user:secret@bridge.example/api"
     assert post.call_args.args == ("https://bridge.example/claim/once",)
-    assert "timeout" in post.call_args.kwargs
+    assert post.call_args.kwargs["timeout"] == 31
     assert post.call_args.kwargs["allow_redirects"] is False
 
 
-def test_get_accounts_returns_balance_fields():
+def test_get_accounts_returns_balance_fields(monkeypatch):
+    monkeypatch.setenv("BUDGET_FETCH_TIMEOUT", "32")
     payload = {
         "accounts": [
             {"id": "a1", "name": "Savings", "balance": "12.34", "balance-date": 1234}
@@ -60,6 +62,7 @@ def test_get_accounts_returns_balance_fields():
     ]
     assert get.call_args.args == ("https://user:secret@bridge.example/api/accounts",)
     assert get.call_args.kwargs["params"] == {"balances-only": 1}
+    assert get.call_args.kwargs["timeout"] == 32
     assert get.call_args.kwargs["allow_redirects"] is False
 
 
@@ -207,7 +210,8 @@ def test_daily_request_limit_is_enforced(monkeypatch, tmp_path):
     assert get.call_count == 24
 
 
-def test_transactions_fetches_chunks_and_merges_accounts():
+def test_transactions_fetches_chunks_and_merges_accounts(monkeypatch):
+    monkeypatch.setenv("BUDGET_FETCH_TIMEOUT", "33")
     payloads = [
         {"accounts": [{"id": "a1", "transactions": [{"id": "t1"}]}]},
         {"accounts": [{"id": "a1", "transactions": [{"id": "t2"}]},
@@ -219,6 +223,7 @@ def test_transactions_fetches_chunks_and_merges_accounts():
     assert result == [{"id": "a1", "name": "Savings", "owner": "Me",
                        "transactions": [{"id": "t1"}, {"id": "t2"}]}]
     assert get.call_count == 2
+    assert [call.kwargs["timeout"] for call in get.call_args_list] == [33, 33]
     assert get.call_args_list[0].kwargs["params"]["start-date"] < get.call_args_list[1].kwargs["params"]["start-date"]
 
 
