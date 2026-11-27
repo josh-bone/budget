@@ -18,6 +18,7 @@ import sqlite3
 import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
+from datetime import date
 
 from dotenv import load_dotenv
 from flask import (
@@ -371,6 +372,16 @@ def balances():
     latest_date = None
     try:
         history = get_balance_history()
+        connection = _connect()
+        try:
+            closed_accounts = {
+                name.casefold()
+                for (name,) in connection.execute(
+                    "SELECT name FROM accounts WHERE closed_date IS NOT NULL"
+                )
+            }
+        finally:
+            connection.close()
         if "Source" in history.columns and source_filter != "all":
             history = history[history["Source"] == source_filter]
         if not history.empty:
@@ -384,7 +395,8 @@ def balances():
                         "name": account,
                         "amount": float(latest["Amount"]),
                         "date": latest["Date"],
-                        "stale": latest["Date"] != latest_date,
+                        "stale": latest["Date"] != latest_date
+                        and account.casefold() not in closed_accounts,
                     }
                 )
 
@@ -411,7 +423,7 @@ def accounts():
     connection = _connect()
     try:
         rows = connection.execute(
-            "SELECT id, name FROM accounts ORDER BY name COLLATE NOCASE"
+            "SELECT id, name FROM accounts WHERE closed_date IS NULL ORDER BY name COLLATE NOCASE"
         ).fetchall()
         aliases = {}
         for account_id, alias in connection.execute(
@@ -443,6 +455,82 @@ def accounts():
     finally:
         connection.close()
     return render_template("accounts.html", accounts=account_rows, error=error)
+
+
+@app.route("/accounts/<account_id>/close", methods=["GET", "POST"])
+def close_account(account_id):
+    """Close an account while retaining its historical balance snapshots."""
+    connection = _connect()
+    try:
+        account = connection.execute(
+            "SELECT id, name, closed_date FROM accounts WHERE id=?", (account_id,)
+        ).fetchone()
+        if not account:
+            abort(404)
+        if account[2] is not None:
+            return redirect(url_for("accounts"))
+
+        aliases = [
+            row[0]
+            for row in connection.execute(
+                "SELECT alias FROM account_aliases WHERE account_key=?", (account_id,)
+            )
+        ]
+        names = [account[1], *aliases]
+        if request.method == "GET":
+            return render_template("close_account.html", account=account, close_date="")
+
+        close_date = request.form.get("closed_date", "").strip()
+        try:
+            close_date = date.fromisoformat(close_date).isoformat()
+        except ValueError:
+            flash("Enter a valid closing date.", "error")
+            return (
+                render_template(
+                    "close_account.html",
+                    account=account,
+                    close_date=request.form.get("closed_date", ""),
+                ),
+                400,
+            )
+
+        placeholders = ",".join("?" for _ in names)
+        closing_rows = connection.execute(
+            f"SELECT account, amount FROM balance_snapshots WHERE date=? AND account COLLATE NOCASE IN ({placeholders})",
+            [close_date, *names],
+        ).fetchall()
+        closing_balance = (
+            sum(row[1] for row in closing_rows) if closing_rows else None
+        )
+        confirmed = request.form.get("zeroed")
+        if (
+            closing_balance is None or closing_balance != 0
+        ) and confirmed not in {"yes", "no"}:
+            return render_template(
+                "confirm_close_account.html",
+                account=account,
+                close_date=close_date,
+                closing_balance=closing_balance,
+            )
+        if confirmed == "yes":
+            if closing_rows:
+                connection.executemany(
+                    "UPDATE balance_snapshots SET amount=0 WHERE account=? AND date=?",
+                    [(row[0], close_date) for row in closing_rows],
+                )
+            else:
+                connection.execute(
+                    "INSERT INTO balance_snapshots(account,date,amount,source) VALUES(?,?,0,'manual')",
+                    (account[1], close_date),
+                )
+        connection.execute(
+            "UPDATE accounts SET closed_date=? WHERE id=?", (close_date, account_id)
+        )
+        connection.commit()
+        flash(f"{account[1]} closed.", "success")
+        return redirect(url_for("accounts"))
+    finally:
+        connection.close()
 
 
 @app.post("/accounts")

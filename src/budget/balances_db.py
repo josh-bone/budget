@@ -67,6 +67,8 @@ def _connect(db_path: str | os.PathLike[str] | None = None) -> sqlite3.Connectio
     account_columns = {
         row[1] for row in connection.execute("PRAGMA table_info(accounts)")
     }
+    if "closed_date" not in account_columns:
+        connection.execute("ALTER TABLE accounts ADD COLUMN closed_date TEXT")
     if "owner" in account_columns:
         connection.execute(
             """INSERT OR IGNORE INTO account_owners (account_id, owner)

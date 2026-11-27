@@ -87,7 +87,7 @@ def test_recategorize_clears_no_longer_matching_rule(tmp_path):
         "INSERT INTO categories(name) VALUES ('Coffee')"
     ).lastrowid
     rule_id = _rule(connection, category, "coffee")
-    connection.execute("INSERT INTO accounts VALUES ('a', 'Checking')")
+    connection.execute("INSERT INTO accounts(id, name) VALUES ('a', 'Checking')")
     connection.execute(
         "INSERT INTO transactions(account_id, transaction_id, description, amount, category_id, rule_id) VALUES ('a','t','coffee',-1,?,?)",
         (category, rule_id),
