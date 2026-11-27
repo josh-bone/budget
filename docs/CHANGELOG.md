@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## v0.2.0
 
 ### Added
 
@@ -31,6 +31,8 @@
 - Aligned shared navigation across pages and reduced layout jitter.
 - Every balance snapshot was overwriting the last one.
 - Removed the nonfunctional Refresh button from the balances page.
+
+## Unreleased
 
 ## v0.1.0
 
