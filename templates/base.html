@@ -10,6 +10,7 @@
 </head>
 <body>
   {% if budget_staging %}<aside class="staging-banner" role="status">STAGING INSTANCE</aside>{% endif %}
+  <div class="main-nav-frame">{% include "_main_nav.html" %}</div>
   {% block content %}{% endblock %}
 </body>
 </html>

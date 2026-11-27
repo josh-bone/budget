@@ -6,7 +6,6 @@
 </style>{% endblock %}
 {% block content %}
 <main class="shell">
-  {% include "_main_nav.html" %}
   {% for category, message in get_flashed_messages(with_categories=true) %}<p class="flash {{ category }}" role="status">{{ message }}</p>{% endfor %}
   <header><p class="eyebrow">Budget setup</p><h1>Accounts</h1><p class="intro">Manage canonical accounts, owners, and alternate names used to match balance snapshots.</p></header>
   <form class="new-account" method="post" action="{{ url_for('create_account') }}"><label for="new-account-name">Add a canonical account</label><input id="new-account-name" name="name" required placeholder="e.g. Retirement account"><button type="submit">Add account</button></form>

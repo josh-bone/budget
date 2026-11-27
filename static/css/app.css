@@ -16,6 +16,7 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
+html { scrollbar-gutter: stable; }
 .staging-banner { position: sticky; z-index: 1000; top: 0; width: 100%; padding: .55rem 1rem; margin: -2.5rem 0 1.5rem; border-bottom: 2px solid #a16207; background: #fef08a; color: #422006; font: 600 .78rem/1.3 var(--font-mono); letter-spacing: .08em; text-align: center; }
 body { margin: 0; min-height: 100vh; padding: 2.5rem 1.5rem 5rem; background: var(--bg); color: var(--ink); font: 300 1rem/1.5 var(--font-body); }
 a { color: var(--accent); }
@@ -38,7 +39,8 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface) 60%, transparent)
 .wrap { width: min(100%, 1180px); margin: 0 auto; }
 .shell { width: min(100%, 1180px); margin: 0 auto; padding: 0; }
 .nav { display: flex; flex-wrap: wrap; gap: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 2rem; }
-.main-nav { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; padding: .35rem; border: 1px solid var(--border); border-radius: 8px; margin: 0 auto 2rem; background: var(--surface-raised); }
+.main-nav-frame { width: min(100%, 1180px); margin: 0 auto 2rem; }
+.main-nav { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; width: 100%; padding: .35rem; border: 1px solid var(--border); border-radius: 8px; margin: 0; background: var(--surface-raised); }
 .main-nav a { padding: .55rem .8rem; border-radius: 5px; color: var(--muted); font: 500 .75rem/1.2 var(--font-body); text-decoration: none; white-space: nowrap; }
 .main-nav a:hover { background: var(--surface); color: var(--ink); }
 .main-nav a[aria-current="page"] { background: var(--ink); color: var(--surface-raised); }
@@ -91,7 +93,8 @@ footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--bor
   .wrap { width: 100%; }
   table { display: block; overflow-x: auto; }
   .header-actions { gap: .75rem 1rem; }
-  .main-nav { gap: .2rem; margin-bottom: 1.5rem; }
+  .main-nav-frame { margin-bottom: 1.5rem; }
+  .main-nav { gap: .2rem; }
   .main-nav a { padding: .5rem .6rem; }
 }
 @media (max-width: 540px) { .page-overview .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .page-overview .bar-cell { display: none; } }

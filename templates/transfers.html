@@ -9,7 +9,6 @@
 </style>{% endblock %}
 {% block content %}
 <main class="transfer-page">
-  {% include "_main_nav.html" %}
   {% for category,message in get_flashed_messages(with_categories=true) %}<p class="transfer-flash {{ category }}" role="status">{{ message }}</p>{% endfor %}
   <header><p class="meta">Review</p><h1>Attention Needed</h1><p class="transfer-intro">Review balance names that need an account match and possible transfer pairs.</p></header>
 
