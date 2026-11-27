@@ -11,20 +11,22 @@ function seed(data: {
   categories?: string[];
 }): number[] {
   const script = String.raw`
-import json, sqlite3, sys
+import json, sys
+from budget.balances_db import _connect
 data = json.loads(sys.argv[1])
-db = sqlite3.connect(${JSON.stringify(databasePath)})
-db.execute("PRAGMA foreign_keys=ON")
-db.execute("INSERT INTO accounts (id, name) VALUES (?, ?)", (data["accountId"], data["accountName"]))
-category_ids = []
-for name in data.get("categories", []):
-    cursor = db.execute("INSERT INTO categories (name) VALUES (?)", (name,))
-    category_ids.append(cursor.lastrowid)
-for transaction in data.get("transactions", []):
-    db.execute("INSERT INTO transactions (account_id, transaction_id, posted_date, amount, description) VALUES (?, ?, ?, ?, ?)", (data["accountId"], transaction["id"], transaction["date"], transaction["amount"], transaction["description"]))
-db.commit()
-print(json.dumps(category_ids))
-db.close()
+db = _connect(${JSON.stringify(databasePath)})
+try:
+    db.execute("INSERT INTO accounts (id, name) VALUES (?, ?)", (data["accountId"], data["accountName"]))
+    category_ids = []
+    for name in data.get("categories", []):
+        cursor = db.execute("INSERT INTO categories (name) VALUES (?)", (name,))
+        category_ids.append(cursor.lastrowid)
+    for transaction in data.get("transactions", []):
+        db.execute("INSERT INTO transactions (account_id, transaction_id, posted_date, amount, description) VALUES (?, ?, ?, ?, ?)", (data["accountId"], transaction["id"], transaction["date"], transaction["amount"], transaction["description"]))
+    db.commit()
+    print(json.dumps(category_ids))
+finally:
+    db.close()
 `;
   const result = execFileSync('uv', ['run', '--no-sync', 'python', '-c', script, JSON.stringify(data)], {
     encoding: 'utf8',
@@ -95,7 +97,7 @@ test('creating a description rule categorizes matching transactions', async ({ p
   await addRule.getByLabel('Criterion').selectOption('description');
   await addRule.getByLabel('Description', { exact: true }).fill(merchant);
   await addRule.getByRole('button', { name: 'Add rule' }).click();
-  await expect(page.getByRole('status')).toContainText('Rule saved.');
+  await expect(page.getByRole('status').filter({ hasText: 'Rule saved.' })).toHaveText('Rule saved.');
 
   await page.goto('/transactions');
   const row = page.getByRole('row').filter({ hasText: description });
@@ -110,7 +112,7 @@ test('a newly created account can be assigned an owner', async ({ page }) => {
   await page.goto('/accounts');
   await page.getByLabel('Add a canonical account').fill(account.name);
   await page.getByRole('button', { name: 'Add account' }).click();
-  await expect(page.getByRole('status')).toContainText(`Added account ${account.name}.`);
+  await expect(page.getByRole('status').filter({ hasText: 'Account added.' })).toHaveText('Account added.');
 
   const row = page.getByRole('row').filter({ hasText: account.name });
   await row.getByLabel(`Owner for ${account.name}`).fill(owner);
