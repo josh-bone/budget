@@ -1767,4 +1767,5 @@ if __name__ == "__main__":
         "yes",
         "on",
     }
-    app.run(debug=debug)
+    port = int(os.environ.get("BUDGET_PORT", "5000"))
+    app.run(debug=debug, port=port)

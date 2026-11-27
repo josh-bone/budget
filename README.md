@@ -164,7 +164,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Playwright starts the Flask app on `http://127.0.0.1:5000` and uses
+Playwright starts the Flask app on `http://127.0.0.1:5005` and uses
 `/tmp/budget-ui-playwright.sqlite3` instead of your normal budget database. The tests add uniquely
-named accounts, categories, and transactions to that database. Stop any other app already using
-port 5000 before running locally so the suite uses its isolated test server.
+named accounts, categories, and transactions to that database. The test server uses `BUDGET_PORT=5005`
+so it does not conflict with macOS Control Center's AirPlay Receiver on port 5000.
