@@ -117,7 +117,10 @@ def test_simplefin_reimport_replaces_and_clears_account_owner(tmp_path):
     account.pop("owner")
     insert_simplefin_transactions([account], db_path=path)
     connection = _connect(path)
-    assert connection.execute(
-        "SELECT owner FROM account_owners WHERE account_id='a'"
-    ).fetchone() is None
+    assert (
+        connection.execute(
+            "SELECT owner FROM account_owners WHERE account_id='a'"
+        ).fetchone()
+        is None
+    )
     connection.close()

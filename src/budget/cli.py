@@ -252,9 +252,11 @@ def main():
         result = run_retirement_forecast(
             config=forecast_config,
             initial_balance=args.initial_balance
-            if args.initial_balance is not None else None,
+            if args.initial_balance is not None
+            else None,
             monthly_contribution=args.monthly_contribution
-            if args.monthly_contribution is not None else None,
+            if args.monthly_contribution is not None
+            else None,
             latest_budget=latest_budget,
             account_patterns=account_patterns,
             contribution_patterns=contribution_patterns,

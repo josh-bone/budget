@@ -158,7 +158,12 @@ def test_derived_division_by_zero_logs_specific_warning(caplog):
 
 def test_derived_field_names_with_hyphens_are_not_supported(caplog):
     with caplog.at_level("WARNING"):
-        assert _evaluate_derived("net-income - expenses", {"net-income": 8.0, "expenses": 3.0}) is None
+        assert (
+            _evaluate_derived(
+                "net-income - expenses", {"net-income": 8.0, "expenses": 3.0}
+            )
+            is None
+        )
     assert "Could not evaluate" in caplog.text
 
 

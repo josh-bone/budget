@@ -5,7 +5,9 @@ def parse_money(value: object) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
     if not isinstance(value, str):
-        raise ValueError(f"Expected a money string or number, got {type(value).__name__}.")
+        raise ValueError(
+            f"Expected a money string or number, got {type(value).__name__}."
+        )
     text = value.strip()
     if not text:
         return None

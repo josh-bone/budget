@@ -73,7 +73,9 @@ def test_database_migrates_existing_accounts_table(tmp_path):
 
     columns = {row[1] for row in connection.execute("PRAGMA table_info(accounts)")}
     assert "closed_date" in columns
-    assert connection.execute("SELECT closed_date FROM accounts WHERE id='old'").fetchone() == (None,)
+    assert connection.execute(
+        "SELECT closed_date FROM accounts WHERE id='old'"
+    ).fetchone() == (None,)
     connection.close()
 
 
@@ -95,7 +97,9 @@ def test_zero_balance_on_closing_date_closes_without_confirmation(client, tmp_pa
     _account(path)
     _snapshot(path, "Checking", "2026-11-20", 0.0)
 
-    response = client.post("/accounts/checking/close", data={"closed_date": "2026-11-20"})
+    response = client.post(
+        "/accounts/checking/close", data={"closed_date": "2026-11-20"}
+    )
 
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/accounts")
@@ -181,7 +185,12 @@ def test_closed_and_unknown_accounts_cannot_be_closed_again(client, tmp_path):
     _account(path, closed_date="2026-11-20")
 
     assert client.get("/accounts/checking/close").status_code == 302
-    assert client.post("/accounts/missing/close", data={"closed_date": "2026-11-20"}).status_code == 404
+    assert (
+        client.post(
+            "/accounts/missing/close", data={"closed_date": "2026-11-20"}
+        ).status_code
+        == 404
+    )
 
 
 def test_closed_account_is_hidden_but_history_is_preserved(client, tmp_path):
@@ -209,4 +218,3 @@ def test_closed_account_is_not_marked_stale_on_balances(client, tmp_path):
     assert response.status_code == 200
     assert b"Checking" in response.data
     assert b"Stale" not in response.data
-

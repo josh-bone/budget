@@ -134,14 +134,15 @@ def test_accounts_displays_and_updates_owner(monkeypatch, tmp_path):
     response = client.get("/accounts")
     assert b'value="Owner B"' in response.data
 
-    response = client.post(
-        "/accounts/owner", data={"account_id": "a1", "owner": "  "}
-    )
+    response = client.post("/accounts/owner", data={"account_id": "a1", "owner": "  "})
     assert response.status_code == 302
     connection = _connect()
-    assert connection.execute(
-        "SELECT owner FROM account_owners WHERE account_id='a1'"
-    ).fetchone() is None
+    assert (
+        connection.execute(
+            "SELECT owner FROM account_owners WHERE account_id='a1'"
+        ).fetchone()
+        is None
+    )
     connection.close()
 
 

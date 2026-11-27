@@ -124,7 +124,9 @@ def _evaluate_derived(
         if op == "*":
             return left * right
         if right == 0:
-            logger.warning("Cannot evaluate derived expression '%s': division by zero", expression)
+            logger.warning(
+                "Cannot evaluate derived expression '%s': division by zero", expression
+            )
             return None
         return left / right
     logger.warning(f"Could not evaluate derived expression: '{expression}'")
