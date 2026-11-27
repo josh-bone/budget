@@ -1,0 +1,8 @@
+<nav class="main-nav" aria-label="Main navigation">
+  <a href="/" {% if request.path == '/' or request.path.startswith('/month/') %}aria-current="page"{% endif %}>Overview</a>
+  <a href="/transactions" {% if request.path == '/transactions' %}aria-current="page"{% endif %}>Transactions</a>
+  <a href="/balances" {% if request.path == '/balances' %}aria-current="page"{% endif %}>Balances &amp; Net Worth</a>
+  <a href="/accounts" {% if request.path.startswith('/accounts') %}aria-current="page"{% endif %}>Accounts</a>
+  <a href="/attention" {% if request.path == '/attention' %}aria-current="page"{% endif %}>Attention Needed</a>
+  <a href="/rules" {% if request.path == '/rules' %}aria-current="page"{% endif %}>Categories &amp; Rules</a>
+</nav>

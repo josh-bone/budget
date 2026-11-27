@@ -3,14 +3,10 @@
 {% block page_head %}{% endblock %}
 {% block content %}
 <div class="wrap page-balances">
+  {% include "_main_nav.html" %}
   <header>
     <p class="eyebrow">Personal Finance</p>
     <h1>Balances &amp; Net Worth</h1>
-    <div class="header-actions">
-      <a class="mono-link" href="/">← Budget overview</a>
-      <a class="mono-link" href="/accounts">Accounts</a>
-      <a class="mono-link" href="/attention">Attention Needed</a>
-    </div>
   </header>
 
   <form class="source-filter" action="/balances" method="get" data-auto-submit>

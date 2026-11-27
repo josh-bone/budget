@@ -3,16 +3,11 @@
 {% block page_head %}{% endblock %}
 {% block content %}
 <div class="wrap page-overview">
+  {% include "_main_nav.html" %}
 
   <header>
     <p class="eyebrow">Personal Finance</p>
     <h1>Budget Overview</h1>
-    <div class="header-actions">
-      <a class="mono-link" href="/balances">Balances &amp; net worth →</a>
-      <a class="mono-link" href="/transactions">Transactions →</a>
-      <a class="mono-link" href="/rules">Categories &amp; rules →</a>
-      <a class="mono-link" href="/attention">Attention needed →</a>
-    </div>
   </header>
 
   {% if error %}

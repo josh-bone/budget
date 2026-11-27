@@ -38,6 +38,10 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface) 60%, transparent)
 .wrap { width: min(100%, 1180px); margin: 0 auto; }
 .shell { width: min(100%, 1180px); margin: 0 auto; padding: 0; }
 .nav { display: flex; flex-wrap: wrap; gap: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 2rem; }
+.main-nav { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; padding: .35rem; border: 1px solid var(--border); border-radius: 8px; margin: 0 auto 2rem; background: var(--surface-raised); }
+.main-nav a { padding: .55rem .8rem; border-radius: 5px; color: var(--muted); font: 500 .75rem/1.2 var(--font-body); text-decoration: none; white-space: nowrap; }
+.main-nav a:hover { background: var(--surface); color: var(--ink); }
+.main-nav a[aria-current="page"] { background: var(--ink); color: var(--surface-raised); }
 header.hero, body > .wrap > header, .wrap > header { padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 2rem; }
 .header-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.5rem; margin-top: 1rem; }
 .section-head, .section-header { display: flex; align-items: baseline; gap: 1rem; margin: 1.5rem 0 .75rem; font: 400 1.1rem var(--font-display); }
@@ -87,6 +91,8 @@ footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--bor
   .wrap { width: 100%; }
   table { display: block; overflow-x: auto; }
   .header-actions { gap: .75rem 1rem; }
+  .main-nav { gap: .2rem; margin-bottom: 1.5rem; }
+  .main-nav a { padding: .5rem .6rem; }
 }
 @media (max-width: 540px) { .page-overview .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .page-overview .bar-cell { display: none; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
