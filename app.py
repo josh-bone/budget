@@ -1266,6 +1266,20 @@ def transaction_spend():
     if query:
         clauses.append("INSTR(LOWER(t.description), LOWER(?)) > 0")
         values.append(query)
+    min_amount = request.args.get("min_amount", "").strip()
+    max_amount = request.args.get("max_amount", "").strip()
+    try:
+        if min_amount:
+            clauses.append("t.amount >= ?")
+            values.append(float(min_amount))
+    except ValueError:
+        min_amount = ""
+    try:
+        if max_amount:
+            clauses.append("t.amount <= ?")
+            values.append(float(max_amount))
+    except ValueError:
+        max_amount = ""
     for value in selected:
         if value == "uncategorized":
             category_clauses.append("t.category_id IS NULL")
