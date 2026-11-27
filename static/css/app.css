@@ -39,7 +39,7 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface) 60%, transparent)
 .wrap { width: min(100%, 1180px); margin: 0 auto; }
 .shell { width: min(100%, 1180px); margin: 0 auto; padding: 0; }
 .nav { display: flex; flex-wrap: wrap; gap: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 2rem; }
-.main-nav-frame { width: min(100%, 1180px); margin: 0 auto 2rem; }
+.main-nav-frame { position: relative; left: calc(50vw - 50%); width: min(100%, 1180px); margin: 0 auto 2rem; }
 .main-nav { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; width: 100%; padding: .35rem; border: 1px solid var(--border); border-radius: 8px; margin: 0; background: var(--surface-raised); }
 .main-nav a { padding: .55rem .8rem; border-radius: 5px; color: var(--muted); font: 500 .75rem/1.2 var(--font-body); text-decoration: none; white-space: nowrap; }
 .main-nav a:hover { background: var(--surface); color: var(--ink); }
