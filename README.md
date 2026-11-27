@@ -152,3 +152,19 @@ npm run build
 ```
 
 The frontend build requires Node.js and writes the generated bundle to `static/`.
+
+### End-to-end browser tests
+
+The Playwright suite covers the main dashboard journeys. Install the JavaScript dependencies and
+Chromium once, then run the suite:
+
+```sh
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
+
+Playwright starts the Flask app on `http://127.0.0.1:5000` and uses
+`/tmp/budget-ui-playwright.sqlite3` instead of your normal budget database. The tests add uniquely
+named accounts, categories, and transactions to that database. Stop any other app already using
+port 5000 before running locally so the suite uses its isolated test server.
