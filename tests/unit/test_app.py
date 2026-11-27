@@ -78,13 +78,29 @@ def test_unknown_month_returns_not_found(monkeypatch):
 
 
 def test_security_headers_and_no_external_page_resources(monkeypatch):
-    monkeypatch.setattr(web_app, "load_sqlite_monthly_trends", lambda: {
-        "months": [], "income": [], "expenses": [], "diff": [],
-        "total_income": 0, "total_expenses": 0, "avg_income": 0, "avg_expenses": 0,
-    })
-    monkeypatch.setattr(web_app, "load_all_months", lambda: {
-        "1/2026": {"summary": {"net_income": None, "total_expenses": None, "diff": None}}
-    })
+    monkeypatch.setattr(
+        web_app,
+        "load_sqlite_monthly_trends",
+        lambda: {
+            "months": [],
+            "income": [],
+            "expenses": [],
+            "diff": [],
+            "total_income": 0,
+            "total_expenses": 0,
+            "avg_income": 0,
+            "avg_expenses": 0,
+        },
+    )
+    monkeypatch.setattr(
+        web_app,
+        "load_all_months",
+        lambda: {
+            "1/2026": {
+                "summary": {"net_income": None, "total_expenses": None, "diff": None}
+            }
+        },
+    )
     client = web_app.app.test_client()
 
     for path in ("/", "/month/1/2026"):

@@ -21,7 +21,16 @@ from dataclasses import dataclass
 from urllib.parse import quote, unquote
 
 from dotenv import load_dotenv
-from flask import Flask, abort, flash, jsonify, redirect, render_template, request, url_for
+from flask import (
+    Flask,
+    abort,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from werkzeug.exceptions import HTTPException
 
 from budget.analyze import build_budget
@@ -164,7 +173,9 @@ def load_all_months() -> MonthLoadResult:
         pending = set(futures)
         while pending:
             now = time.monotonic()
-            expired = {f for f in pending if now - start_times[futures[f]] >= _RESULT_TIMEOUT}
+            expired = {
+                f for f in pending if now - start_times[futures[f]] >= _RESULT_TIMEOUT
+            }
             for future in expired:
                 sheet = futures[future]
                 future.cancel()
@@ -177,7 +188,9 @@ def load_all_months() -> MonthLoadResult:
             next_timeout = min(
                 _RESULT_TIMEOUT - (now - start_times[futures[f]]) for f in pending
             )
-            done, _ = wait(pending, timeout=max(0, next_timeout), return_when=FIRST_COMPLETED)
+            done, _ = wait(
+                pending, timeout=max(0, next_timeout), return_when=FIRST_COMPLETED
+            )
             for future in done:
                 pending.remove(future)
                 sheet = futures[future]
@@ -189,7 +202,9 @@ def load_all_months() -> MonthLoadResult:
                     log_fn("Fetched sheet '%s' in %.2fs", sheet, elapsed)
                 except Exception as e:
                     failures[sheet] = "Fetch failed"
-                    logger.warning("Failed to fetch sheet '%s' after %.2fs: %s", sheet, elapsed, e)
+                    logger.warning(
+                        "Failed to fetch sheet '%s' after %.2fs: %s", sheet, elapsed, e
+                    )
     finally:
         # A timed-out call may still be running; do not block the request while
         # waiting for a thread that cannot be safely interrupted.
@@ -267,7 +282,9 @@ def index():
         trends = load_sqlite_monthly_trends()
     except Exception:
         logger.exception("Failed to load transaction summary from SQLite")
-        error = "Unable to load the budget summary. Check the application logs for details."
+        error = (
+            "Unable to load the budget summary. Check the application logs for details."
+        )
 
     return render_template(
         "index.html",
@@ -283,7 +300,9 @@ def month_detail(sheet_name: str):
     try:
         load_result = load_all_months()
         # Accept a plain mapping from older callers and route-level overrides.
-        all_months = load_result if isinstance(load_result, dict) else load_result.months
+        all_months = (
+            load_result if isinstance(load_result, dict) else load_result.months
+        )
         failures = {} if isinstance(load_result, dict) else load_result.failures
         if failures:
             failed_sheets = ", ".join(sorted(failures, key=_sort_key))
@@ -317,7 +336,10 @@ def refresh():
     if not source:
         abort(403)
     parsed_source = urlsplit(source)
-    if parsed_source.scheme not in {"http", "https"} or parsed_source.netloc != request.host:
+    if (
+        parsed_source.scheme not in {"http", "https"}
+        or parsed_source.netloc != request.host
+    ):
         abort(403)
     return redirect(url_for("balances"))
 
@@ -1306,5 +1328,10 @@ def update_transaction_category(account_id, transaction_id):
 
 
 if __name__ == "__main__":
-    debug = os.environ.get("FLASK_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
+    debug = os.environ.get("FLASK_DEBUG", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
     app.run(debug=debug)
