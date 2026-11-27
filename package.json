@@ -2,9 +2,11 @@
   "name": "budget-frontend",
   "private": true,
   "scripts": {
-    "build": "tsc --noEmit && esbuild frontend/app.ts --bundle --format=esm --target=es2020 --outfile=static/js/app.js"
+    "build": "tsc --noEmit && esbuild frontend/app.ts --bundle --format=esm --target=es2020 --outfile=static/js/app.js",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "esbuild": "^0.25.0",
     "typescript": "^5.7.0"
   }

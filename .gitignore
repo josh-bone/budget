@@ -9,6 +9,8 @@ data/
 .DS_Store
 *venv*/
 node_modules/
+playwright-report/
+test-results/
 *.env
 __pycache__/
 *.pyc
