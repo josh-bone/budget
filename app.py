@@ -16,6 +16,8 @@ import os
 import secrets
 import sqlite3
 import time
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from dataclasses import dataclass
 from urllib.parse import quote, unquote
 
 from dotenv import load_dotenv
@@ -82,15 +84,19 @@ def _fetch_one(
     return sheet, budget
 
 
-def load_all_months() -> dict[str, dict]:
-    """Legacy Sheets loader retained for month detail and other callers."""
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+@dataclass
+class MonthLoadResult:
+    months: dict[str, dict]
+    failures: dict[str, str]
 
+
+def load_all_months() -> MonthLoadResult:
+    """Legacy Sheets loader retained for month detail and other callers."""
     from budget.cache import budget_cache
 
     cached = budget_cache.get()
     if cached is not None:
-        return cached
+        return MonthLoadResult(months=cached, failures={})
 
     key_file = get_env("GOOGLE_SERVICE_ACCOUNT_KEY")
     spreadsheet_id = get_env("SPREADSHEET_ID")
@@ -121,7 +127,9 @@ def load_all_months() -> dict[str, dict]:
 
     result: dict[str, dict] = {}
 
-    with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
+    failures: dict[str, str] = {}
+    executor = ThreadPoolExecutor(max_workers=_MAX_WORKERS)
+    try:
         futures = {}
         start_times = {}
         for sheet in sheet_names:
@@ -138,24 +146,46 @@ def load_all_months() -> dict[str, dict]:
                 )
             ] = sheet
 
-        for future in as_completed(futures, timeout=_RESULT_TIMEOUT * len(futures)):
-            sheet = futures[future]
-            elapsed = time.monotonic() - start_times[sheet]
-            try:
-                sheet_name, budget = future.result(timeout=_RESULT_TIMEOUT)
-                result[sheet_name] = budget
-                log_fn = logger.warning if elapsed > 5 else logger.info
-                log_fn("Fetched sheet '%s' in %.2fs", sheet, elapsed)
-            except Exception as e:
-                logger.exception(
-                    "Failed to fetch sheet '%s' after %.2fs: %s", sheet, elapsed, e
-                )
+        pending = set(futures)
+        while pending:
+            now = time.monotonic()
+            expired = {f for f in pending if now - start_times[futures[f]] >= _RESULT_TIMEOUT}
+            for future in expired:
+                sheet = futures[future]
+                future.cancel()
+                failures[sheet] = "Timed out"
+                logger.warning("Timed out fetching sheet '%s'", sheet)
+            pending -= expired
+            if not pending:
+                break
+
+            next_timeout = min(
+                _RESULT_TIMEOUT - (now - start_times[futures[f]]) for f in pending
+            )
+            done, _ = wait(pending, timeout=max(0, next_timeout), return_when=FIRST_COMPLETED)
+            for future in done:
+                pending.remove(future)
+                sheet = futures[future]
+                elapsed = time.monotonic() - start_times[sheet]
+                try:
+                    sheet_name, budget = future.result()
+                    result[sheet_name] = budget
+                    log_fn = logger.warning if elapsed > 5 else logger.info
+                    log_fn("Fetched sheet '%s' in %.2fs", sheet, elapsed)
+                except Exception as e:
+                    failures[sheet] = "Fetch failed"
+                    logger.warning("Failed to fetch sheet '%s' after %.2fs: %s", sheet, elapsed, e)
+    finally:
+        # A timed-out call may still be running; do not block the request while
+        # waiting for a thread that cannot be safely interrupted.
+        executor.shutdown(wait=not failures, cancel_futures=True)
 
     # Re-sort after parallel completion (arrival order is non-deterministic)
     result = dict(sorted(result.items(), key=lambda kv: _sort_key(kv[0])))
 
-    budget_cache.set(result)
-    return result
+    if not failures:
+        budget_cache.set(result)
+    return MonthLoadResult(months=result, failures=failures)
 
 
 def build_trends(all_months: dict[str, dict]) -> dict:
@@ -234,9 +264,15 @@ def index():
 @app.route("/month/<path:sheet_name>")
 def month_detail(sheet_name: str):
     sheet_name = unquote(sheet_name)
-    error = budget = all_months = None
+    error = warning = budget = all_months = None
     try:
-        all_months = load_all_months()
+        load_result = load_all_months()
+        # Accept a plain mapping from older callers and route-level overrides.
+        all_months = load_result if isinstance(load_result, dict) else load_result.months
+        failures = {} if isinstance(load_result, dict) else load_result.failures
+        if failures:
+            failed_sheets = ", ".join(sorted(failures, key=_sort_key))
+            warning = f"Some months could not be loaded: {failed_sheets}. Data may be incomplete."
         if sheet_name not in all_months:
             error = f"Sheet '{sheet_name}' not found."
         else:
@@ -252,6 +288,7 @@ def month_detail(sheet_name: str):
         budget=budget,
         months=months,
         error=error,
+        warning=warning,
     )
 
 
