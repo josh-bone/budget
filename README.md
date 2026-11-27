@@ -104,9 +104,9 @@ spend chart; it does not filter the transaction table. The Sheets-backed `/month
 and `/refresh` redirect remain legacy paths. The home page and current balances do not require
 Sheets settings.
 
-The dashboard has no authentication or CSRF protection, including on state-changing category and
-rule routes. Keep it on a trusted machine or network, or put it behind an authenticated reverse
-proxy. See [Security](docs/SECURITY.md).
+Keep the dashboard on a trusted machine or network, or put it behind an authenticated reverse
+proxy or VPN. It has no user authentication. The `/refresh` POST accepts only same-host Origin or
+Referer requests. See [Deployment](docs/DEPLOYMENT.md) and [Security](docs/SECURITY.md).
 
 ## Configuration and environment
 

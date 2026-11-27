@@ -1,12 +1,16 @@
 # Deployment
 
-Use Gunicorn behind a trusted reverse proxy or VPN. The app has no authentication or CSRF protection, and its category/rule routes change data.
+Keep the dashboard bound to localhost and use it on a trusted machine, or put it behind an authenticated reverse proxy or VPN. Do not expose the Flask server directly to the internet. The dashboard does not provide user authentication, and category/rule routes change data.
 
 Example command:
 
 ```sh
 .venv/bin/gunicorn --workers 2 --bind 127.0.0.1:8000 app:app
 ```
+
+For local development, `flask --app app run` binds to localhost by default. The Werkzeug debugger
+is disabled unless `FLASK_DEBUG=1` (or `true`, `yes`, or `on`) is explicitly set; never enable it
+on a reachable deployment.
 
 Set a stable, random `FLASK_SECRET_KEY` in the service environment. Without it, each process generates a different key at startup, so flash messages can fail when requests move between Gunicorn workers and sessions become invalid after restarts.
 

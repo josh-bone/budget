@@ -11,9 +11,9 @@
     </div>
   </header>
 
-  <form class="source-filter" action="/balances" method="get">
+  <form class="source-filter" action="/balances" method="get" data-auto-submit>
     <label for="source">Data source</label>
-    <select id="source" name="source" onchange="this.form.submit()">
+    <select id="source" name="source">
       <option value="all" {% if source_filter == 'all' %}selected{% endif %}>All sources</option>
       <option value="manual" {% if source_filter == 'manual' %}selected{% endif %}>Manual</option>
       <option value="simplefin" {% if source_filter == 'simplefin' %}selected{% endif %}>SimpleFIN</option>

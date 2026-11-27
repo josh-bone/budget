@@ -7,7 +7,7 @@ Routes:
     JSON endpoints: /api/transactions/spend, /api/balances/trend
 
 Run:
-    flask --app app run --debug
+    flask --app app run
 """
 
 import json
@@ -21,7 +21,8 @@ from dataclasses import dataclass
 from urllib.parse import quote, unquote
 
 from dotenv import load_dotenv
-from flask import Flask, flash, jsonify, redirect, render_template, request, url_for
+from flask import Flask, abort, flash, jsonify, redirect, render_template, request, url_for
+from werkzeug.exceptions import HTTPException
 
 from budget.analyze import build_budget
 from budget.balances_db import _connect, get_balance_history
@@ -42,6 +43,20 @@ app.config["BUDGET_STAGING"] = os.environ.get("BUDGET_STAGING", "").strip().lowe
 }
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; font-src 'self'; connect-src 'self'; "
+        "object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    )
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @app.context_processor
@@ -250,9 +265,9 @@ def index():
     error = trends = None
     try:
         trends = load_sqlite_monthly_trends()
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to load transaction summary from SQLite")
-        error = str(e)
+        error = "Unable to load the budget summary. Check the application logs for details."
 
     return render_template(
         "index.html",
@@ -274,12 +289,13 @@ def month_detail(sheet_name: str):
             failed_sheets = ", ".join(sorted(failures, key=_sort_key))
             warning = f"Some months could not be loaded: {failed_sheets}. Data may be incomplete."
         if sheet_name not in all_months:
-            error = f"Sheet '{sheet_name}' not found."
-        else:
-            budget = all_months[sheet_name]
-    except Exception as e:
+            abort(404)
+        budget = all_months[sheet_name]
+    except HTTPException:
+        raise
+    except Exception:
         logger.exception("Failed to load budget")
-        error = str(e)
+        error = "Unable to load this month's budget. Check the application logs for details."
 
     months = list(all_months.keys()) if all_months else []
     return render_template(
@@ -295,6 +311,14 @@ def month_detail(sheet_name: str):
 @app.route("/refresh", methods=["POST"])
 def refresh():
     # Balance pages read SQLite directly; rendering the destination reloads it.
+    from urllib.parse import urlsplit
+
+    source = request.headers.get("Origin") or request.headers.get("Referer")
+    if not source:
+        abort(403)
+    parsed_source = urlsplit(source)
+    if parsed_source.scheme not in {"http", "https"} or parsed_source.netloc != request.host:
+        abort(403)
     return redirect(url_for("balances"))
 
 
@@ -328,9 +352,9 @@ def balances():
                 )
 
             net_worth = sum(account["amount"] for account in accounts)
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to load balances from SQLite")
-        error = str(e)
+        error = "Unable to load balances. Check the application logs for details."
 
     return render_template(
         "balances.html",
@@ -1282,4 +1306,5 @@ def update_transaction_category(account_id, transaction_id):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    debug = os.environ.get("FLASK_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
+    app.run(debug=debug)

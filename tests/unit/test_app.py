@@ -65,15 +65,59 @@ def test_month_detail_logs_loader_failure(caplog, monkeypatch):
     response = web_app.app.test_client().get("/month/1/2026")
 
     assert response.status_code == 200
-    assert b"Sheets unavailable" in response.data
+    assert b"Sheets unavailable" not in response.data
+    assert b"Unable to load this month&#39;s budget" in response.data
     assert "Failed to load budget" in caplog.text
 
 
+def test_unknown_month_returns_not_found(monkeypatch):
+    monkeypatch.setattr(web_app, "load_all_months", lambda: {"1/2026": {}})
+    response = web_app.app.test_client().get("/month/2/2026")
+
+    assert response.status_code == 404
+
+
+def test_security_headers_and_no_external_page_resources(monkeypatch):
+    monkeypatch.setattr(web_app, "load_sqlite_monthly_trends", lambda: {
+        "months": [], "income": [], "expenses": [], "diff": [],
+        "total_income": 0, "total_expenses": 0, "avg_income": 0, "avg_expenses": 0,
+    })
+    monkeypatch.setattr(web_app, "load_all_months", lambda: {
+        "1/2026": {"summary": {"net_income": None, "total_expenses": None, "diff": None}}
+    })
+    client = web_app.app.test_client()
+
+    for path in ("/", "/month/1/2026"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert response.headers["Cache-Control"] == "no-store"
+        assert "default-src 'self'" in response.headers["Content-Security-Policy"]
+        assert response.headers["X-Frame-Options"] == "DENY"
+        assert response.headers["Referrer-Policy"] == "no-referrer"
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert b"fonts.googleapis.com" not in response.data
+        assert b"fonts.gstatic.com" not in response.data
+
+
 def test_refresh_redirects_to_balances():
-    response = web_app.app.test_client().post("/refresh")
+    response = web_app.app.test_client().post(
+        "/refresh", headers={"Origin": "http://localhost"}
+    )
 
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/balances")
+
+
+def test_refresh_rejects_cross_origin_post():
+    response = web_app.app.test_client().post(
+        "/refresh", headers={"Origin": "https://attacker.example"}
+    )
+
+    assert response.status_code == 403
+
+
+def test_refresh_requires_origin_or_referer():
+    assert web_app.app.test_client().post("/refresh").status_code == 403
 
 
 def test_sort_key_orders_month_tabs_and_places_invalid_names_first():
