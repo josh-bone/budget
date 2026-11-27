@@ -7,6 +7,7 @@ TTL is controlled by the BUDGET_CACHE_TTL env var (seconds, default 300).
 
 import logging
 import os
+import threading
 import time
 from dataclasses import dataclass, field
 
@@ -34,13 +35,16 @@ class _CacheEntry:
 class BudgetCache:
     def __init__(self):
         self._entry: _CacheEntry | None = None
+        # Per-process single-flight lock. Gunicorn workers each have their own cache.
+        self.lock = threading.RLock()
 
     def get(self) -> dict | None:
         ttl = _get_ttl()
-        if self._entry and self._entry.is_fresh(ttl):
-            age = int(time.monotonic() - self._entry.fetched_at)
+        entry = self._entry
+        if entry and entry.is_fresh(ttl):
+            age = int(time.monotonic() - entry.fetched_at)
             logger.info(f"Cache hit (age {age}s, TTL {ttl}s)")
-            return self._entry.data
+            return entry.data
         return None
 
     def set(self, data: dict) -> None:
@@ -53,7 +57,8 @@ class BudgetCache:
 
     @property
     def fetched_at(self) -> float | None:
-        return self._entry.fetched_at if self._entry else None
+        entry = self._entry
+        return entry.fetched_at if entry else None
 
 
 # Module-level singleton — shared across all requests in the process

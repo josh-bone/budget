@@ -1,6 +1,6 @@
 document.querySelectorAll("[data-month-picker]").forEach((picker) => {
   picker.addEventListener("change", () => {
-    window.location.assign(`/month/${encodeURIComponent(picker.value)}`);
+    window.location.assign(picker.selectedOptions[0].dataset.url);
   });
 });
 

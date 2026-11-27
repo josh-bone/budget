@@ -30,6 +30,19 @@ def test_invalidate_clears_cache():
     assert cache.get() is None
 
 
+def test_get_uses_one_entry_snapshot_during_invalidation():
+    cache = BudgetCache()
+    cache.set(SAMPLE_DATA)
+    entry = cache._entry
+
+    def invalidate_during_freshness_check(_ttl):
+        cache.invalidate()
+        return True
+
+    entry.is_fresh = invalidate_during_freshness_check
+    assert cache.get() == SAMPLE_DATA
+
+
 def test_fetched_at_is_none_before_set():
     cache = BudgetCache()
     assert cache.fetched_at is None

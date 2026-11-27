@@ -149,6 +149,19 @@ def test_derived_division_by_zero_returns_none():
     assert _evaluate_derived("a / b", {"a": 10.0, "b": 0.0}) is None
 
 
+def test_derived_division_by_zero_logs_specific_warning(caplog):
+    with caplog.at_level("WARNING"):
+        assert _evaluate_derived("a / b", {"a": 10.0, "b": 0.0}) is None
+    assert "division by zero" in caplog.text
+    assert "Could not evaluate" not in caplog.text
+
+
+def test_derived_field_names_with_hyphens_are_not_supported(caplog):
+    with caplog.at_level("WARNING"):
+        assert _evaluate_derived("net-income - expenses", {"net-income": 8.0, "expenses": 3.0}) is None
+    assert "Could not evaluate" in caplog.text
+
+
 def test_derived_returns_none_when_left_operand_missing():
     assert _evaluate_derived("a - b", {"b": 5.0}) is None
 

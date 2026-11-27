@@ -166,7 +166,7 @@
     {% if months %}
     <select class="month-picker" data-month-picker>
       {% for m in months %}
-      <option value="{{ m }}" {% if m == sheet_name %}selected{% endif %}>{{ m }}</option>
+      <option value="{{ m }}" data-url="{{ url_for('month_detail', month_slug=m.replace('/', '-', 1)) }}" {% if m == sheet_name %}selected{% endif %}>{{ m }}</option>
       {% endfor %}
     </select>
     {% endif %}

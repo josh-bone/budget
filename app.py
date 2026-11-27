@@ -18,7 +18,6 @@ import sqlite3
 import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
-from urllib.parse import unquote
 
 from dotenv import load_dotenv
 from flask import (
@@ -119,6 +118,17 @@ def load_all_months() -> MonthLoadResult:
     cached = budget_cache.get()
     if cached is not None:
         return MonthLoadResult(months=cached, failures={})
+
+    # Serialize cache misses in this worker and recheck after acquiring the lock.
+    # Gunicorn workers have separate process-local caches and locks.
+    with budget_cache.lock:
+        cached = budget_cache.get()
+        if cached is not None:
+            return MonthLoadResult(months=cached, failures={})
+        return _load_all_months_uncached(budget_cache)
+
+
+def _load_all_months_uncached(budget_cache) -> MonthLoadResult:
 
     key_file = get_env("GOOGLE_SERVICE_ACCOUNT_KEY")
     spreadsheet_id = get_env("SPREADSHEET_ID")
@@ -291,9 +301,10 @@ def index():
     )
 
 
-@app.route("/month/<path:sheet_name>")
-def month_detail(sheet_name: str):
-    sheet_name = unquote(sheet_name)
+@app.route("/month/<month_slug>")
+def month_detail(month_slug: str):
+    # Month sheet names use M/YYYY; a single hyphen makes a URL-safe path segment.
+    sheet_name = month_slug.replace("-", "/", 1)
     error = warning = budget = all_months = None
     try:
         load_result = load_all_months()
@@ -323,6 +334,12 @@ def month_detail(sheet_name: str):
         error=error,
         warning=warning,
     )
+
+
+@app.route("/month/<path:sheet_name>")
+def legacy_month_detail(sheet_name: str):
+    """Keep older slash-containing month URLs working."""
+    return month_detail(sheet_name.replace("/", "-", 1))
 
 
 @app.route("/refresh", methods=["POST"])

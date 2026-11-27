@@ -51,6 +51,12 @@ def test_list_sheet_names_filters_by_pattern():
     assert result == ["1/2026", "2/2026"]
 
 
+def test_list_sheet_names_pattern_requires_full_match():
+    service = make_service(["1/2026", "1/2026\n"])
+    result = list_sheet_names(service, "spreadsheet-id", pattern=r"^\d{1,2}/\d{4}$")
+    assert result == ["1/2026"]
+
+
 def test_list_sheet_names_returns_empty_when_nothing_matches():
     service = make_service(["Summary", "Template"])
     result = list_sheet_names(service, "spreadsheet-id", pattern=r"^\d{1,2}/\d{4}$")
@@ -155,7 +161,16 @@ def test_fetch_cells_sends_correct_ranges():
     fetch_cells(service, "my-sid", "Budget", ["F4", "O16"])
     service.spreadsheets.return_value.values.return_value.batchGet.assert_called_once_with(
         spreadsheetId="my-sid",
-        ranges=["Budget!F4", "Budget!O16"],
+        ranges=["'Budget'!F4", "'Budget'!O16"],
+    )
+
+
+def test_fetch_cells_escapes_apostrophes_in_sheet_name():
+    service = make_service(batch_values=[_value_range("1")])
+    fetch_cells(service, "my-sid", "Bob's Budget", ["F4"])
+    service.spreadsheets.return_value.values.return_value.batchGet.assert_called_once_with(
+        spreadsheetId="my-sid",
+        ranges=["'Bob''s Budget'!F4"],
     )
 
 

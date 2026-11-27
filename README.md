@@ -81,9 +81,13 @@ status changes.
 The forecast expects a CSV with `date`, `nominal_return`, and `inflation` columns. A small
 illustrative file is included at
 [docs/example_returns_inflation.csv](docs/example_returns_inflation.csv); replace it with your own
-historical monthly series for meaningful results. The default path remains
-`data/input/sample_returns_inflation.csv`; use `--csv-path docs/example_returns_inflation.csv` for
-the included example.
+historical monthly series for meaningful results. This included file is the default, so the
+forecast runs after a fresh clone; pass `--csv-path` to use another file.
+
+Legacy Sheets summary expressions support two fields joined by `+`, `-`, `*`, or `/`; field names
+must contain only ASCII letters, digits, and underscores and cannot begin with a digit. The Sheets
+budget cache and its single-flight fetch lock are process-local. With multiple Gunicorn workers,
+each worker maintains its own cache and may fetch independently.
 
 ## Web dashboard
 

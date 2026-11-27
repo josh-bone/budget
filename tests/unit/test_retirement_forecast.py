@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from budget.retirement_forecast import (
+    DEFAULT_CSV_PATH,
     RetirementForecastConfig,
     block_bootstrap_paths,
     build_contribution_schedule,
@@ -14,6 +15,12 @@ from budget.retirement_forecast import (
     get_total_retirement_savings_balance,
     get_current_retirement_savings_contributions,
 )
+
+
+def test_default_csv_is_included_in_repository():
+    from pathlib import Path
+
+    assert Path(DEFAULT_CSV_PATH).is_file()
 
 
 def test_load_historical_data_validates_and_cleans_csv(tmp_path, caplog):

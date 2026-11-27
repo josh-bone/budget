@@ -22,7 +22,7 @@ from budget.utils import parse_money
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CSV_PATH = "data/input/sample_returns_inflation.csv"
+DEFAULT_CSV_PATH = "docs/example_returns_inflation.csv"
 DEFAULT_CURRENT_AGE = 27
 DEFAULT_RETIREMENT_AGE = 65
 DEFAULT_LIFE_EXPECTANCY = 90

@@ -7,6 +7,7 @@ build_budget    — composes both into the final budget dict.
 """
 
 import logging
+import re
 from typing import Any
 
 import pandas as pd
@@ -106,24 +107,26 @@ def _evaluate_derived(
     Returns None if any operand is None or the expression can't be parsed.
     """
     expression = expression.strip()
-    for op in ("-", "+", "*", "/"):
-        if op in expression:
-            parts = expression.split(op, 1)
-            if len(parts) == 2:
-                left_key = parts[0].strip()
-                right_key = parts[1].strip()
-                left = resolved.get(left_key)
-                right = resolved.get(right_key)
-                if left is None or right is None:
-                    return None
-                if op == "-":
-                    return left - right
-                if op == "+":
-                    return left + right
-                if op == "*":
-                    return left * right
-                if op == "/" and right != 0:
-                    return left / right
+    match = re.fullmatch(
+        r"([A-Za-z_][A-Za-z0-9_]*)\s*([+*/-])\s*([A-Za-z_][A-Za-z0-9_]*)",
+        expression,
+    )
+    if match:
+        left_key, op, right_key = match.groups()
+        left = resolved.get(left_key)
+        right = resolved.get(right_key)
+        if left is None or right is None:
+            return None
+        if op == "-":
+            return left - right
+        if op == "+":
+            return left + right
+        if op == "*":
+            return left * right
+        if right == 0:
+            logger.warning("Cannot evaluate derived expression '%s': division by zero", expression)
+            return None
+        return left / right
     logger.warning(f"Could not evaluate derived expression: '{expression}'")
     return None
 

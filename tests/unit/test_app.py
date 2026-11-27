@@ -1,5 +1,8 @@
 import importlib.util
 from pathlib import Path
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 _APP_PATH = Path(__file__).resolve().parents[2] / "app.py"
 _APP_SPEC = importlib.util.spec_from_file_location("budget_web_app", _APP_PATH)
@@ -54,6 +57,33 @@ def test_month_detail_renders_requested_budget(monkeypatch):
 
     assert response.status_code == 200
     assert b"1/2026" in response.data
+    assert b'data-url="/month/1-2026"' in response.data
+
+
+def test_concurrent_month_loads_fetch_once(monkeypatch):
+    from budget.cache import budget_cache
+
+    budget_cache.invalidate()
+    fetch_count = 0
+    count_lock = threading.Lock()
+    months = {"1/2026": {}}
+
+    def uncached_load(cache):
+        nonlocal fetch_count
+        with count_lock:
+            fetch_count += 1
+        time.sleep(0.03)
+        cache.set(months)
+        return web_app.MonthLoadResult(months=months, failures={})
+
+    monkeypatch.setattr(web_app, "_load_all_months_uncached", uncached_load)
+    try:
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(lambda _: web_app.load_all_months(), range(8)))
+        assert fetch_count == 1
+        assert all(result.months == months for result in results)
+    finally:
+        budget_cache.invalidate()
 
 
 def test_month_detail_logs_loader_failure(caplog, monkeypatch):

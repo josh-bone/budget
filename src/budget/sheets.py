@@ -80,7 +80,7 @@ def list_sheet_names(
     names = [s["properties"]["title"] for s in meta["sheets"]]
     if pattern:
         rx = re.compile(pattern)
-        names = [n for n in names if rx.match(n)]
+        names = [n for n in names if rx.fullmatch(n)]
     return names
 
 
@@ -99,7 +99,8 @@ def fetch_cells(
     service: Resource, spreadsheet_id: str, sheet: str, cell_refs: list[str]
 ) -> dict[str, float | None]:
     """Fetch a list of individual cell references in a single batch request."""
-    ranges = [f"{sheet}!{ref}" for ref in cell_refs]
+    quoted_sheet = "'" + sheet.replace("'", "''") + "'"
+    ranges = [f"{quoted_sheet}!{ref}" for ref in cell_refs]
     result = (
         service.spreadsheets()
         .values()
