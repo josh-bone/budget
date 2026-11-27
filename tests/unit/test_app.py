@@ -107,6 +107,43 @@ def test_unknown_month_returns_not_found(monkeypatch):
     assert response.status_code == 404
 
 
+def test_accounts_displays_and_updates_owner(monkeypatch, tmp_path):
+    from budget.balances_db import _connect
+
+    db_path = tmp_path / "accounts.sqlite"
+    monkeypatch.setenv("BUDGET_DB_PATH", str(db_path))
+    connection = _connect()
+    connection.execute("INSERT INTO accounts (id, name) VALUES ('a1', 'Checking')")
+    connection.execute(
+        "INSERT INTO account_owners (account_id, owner) VALUES ('a1', 'Owner A')"
+    )
+    connection.commit()
+    connection.close()
+    monkeypatch.setitem(web_app.app.config, "TESTING", True)
+    client = web_app.app.test_client()
+
+    response = client.get("/accounts")
+    assert response.status_code == 200
+    assert b'value="Owner A"' in response.data
+
+    response = client.post(
+        "/accounts/owner", data={"account_id": "a1", "owner": "Owner B"}
+    )
+    assert response.status_code == 302
+    response = client.get("/accounts")
+    assert b'value="Owner B"' in response.data
+
+    response = client.post(
+        "/accounts/owner", data={"account_id": "a1", "owner": "  "}
+    )
+    assert response.status_code == 302
+    connection = _connect()
+    assert connection.execute(
+        "SELECT owner FROM account_owners WHERE account_id='a1'"
+    ).fetchone() is None
+    connection.close()
+
+
 def test_security_headers_and_no_external_page_resources(monkeypatch):
     monkeypatch.setattr(
         web_app,

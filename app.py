@@ -423,7 +423,9 @@ def accounts():
     connection = _connect()
     try:
         rows = connection.execute(
-            "SELECT id, name FROM accounts WHERE closed_date IS NULL ORDER BY name COLLATE NOCASE"
+            """SELECT a.id, a.name, ao.owner FROM accounts a
+               LEFT JOIN account_owners ao ON ao.account_id=a.id
+               WHERE a.closed_date IS NULL ORDER BY a.name COLLATE NOCASE"""
         ).fetchall()
         aliases = {}
         for account_id, alias in connection.execute(
@@ -433,13 +435,14 @@ def accounts():
         snapshots = connection.execute(
             "SELECT account, date, amount, source FROM balance_snapshots ORDER BY date DESC"
         ).fetchall()
-        for account_id, name in rows:
+        for account_id, name, owner in rows:
             names = {name.casefold(), *(alias.casefold() for alias in aliases.get(account_id, []))}
             latest = next((row for row in snapshots if row[0].casefold() in names), None)
             date_value, amount, source = latest[1:] if latest else (None, None, None)
             account_rows.append({
                 "id": account_id,
                 "name": name,
+                "owner": owner or "",
                 "date": date_value,
                 "amount": amount,
                 "source": {
@@ -455,6 +458,32 @@ def accounts():
     finally:
         connection.close()
     return render_template("accounts.html", accounts=account_rows, error=error)
+
+
+@app.post("/accounts/owner")
+def save_account_owner():
+    """Set or clear an account's manually assigned owner."""
+    account_id = request.form.get("account_id", "")
+    owner = request.form.get("owner", "").strip()
+    connection = _connect()
+    try:
+        if not account_id or not connection.execute(
+            "SELECT 1 FROM accounts WHERE id=?", (account_id,)
+        ).fetchone():
+            abort(404)
+        if owner:
+            connection.execute(
+                """INSERT INTO account_owners (account_id, owner) VALUES (?, ?)
+                   ON CONFLICT(account_id) DO UPDATE SET owner=excluded.owner""",
+                (account_id, owner),
+            )
+        else:
+            connection.execute("DELETE FROM account_owners WHERE account_id=?", (account_id,))
+        connection.commit()
+        flash("Account owner saved.", "success")
+    finally:
+        connection.close()
+    return redirect(url_for("accounts"))
 
 
 @app.route("/accounts/<account_id>/close", methods=["GET", "POST"])

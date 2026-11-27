@@ -413,9 +413,15 @@ def insert_simplefin_transactions(
                ON CONFLICT(id) DO UPDATE SET name = excluded.name""",
             account_rows,
         )
+        # The latest SimpleFIN payload is authoritative for every imported
+        # account, including when it no longer includes an owner.
+        imported_account_ids = [account_id for account_id, _ in account_rows]
         connection.executemany(
-            """INSERT INTO account_owners (account_id, owner) VALUES (?, ?)
-               ON CONFLICT(account_id) DO UPDATE SET owner = excluded.owner""",
+            "DELETE FROM account_owners WHERE account_id=?",
+            [(account_id,) for account_id in imported_account_ids],
+        )
+        connection.executemany(
+            "INSERT INTO account_owners (account_id, owner) VALUES (?, ?)",
             owner_rows,
         )
         connection.executemany(

@@ -98,3 +98,26 @@ def test_recategorize_clears_no_longer_matching_rule(tmp_path):
         "SELECT category_id, rule_id FROM transactions"
     ).fetchone() == (None, None)
     connection.close()
+
+
+def test_simplefin_reimport_replaces_and_clears_account_owner(tmp_path):
+    path = tmp_path / "db.sqlite"
+    account = {"id": "a", "name": "Checking", "owner": "Owner A", "transactions": []}
+
+    insert_simplefin_transactions([account], db_path=path)
+    account["owner"] = "Owner B"
+    insert_simplefin_transactions([account], db_path=path)
+
+    connection = _connect(path)
+    assert connection.execute(
+        "SELECT owner FROM account_owners WHERE account_id='a'"
+    ).fetchone() == ("Owner B",)
+    connection.close()
+
+    account.pop("owner")
+    insert_simplefin_transactions([account], db_path=path)
+    connection = _connect(path)
+    assert connection.execute(
+        "SELECT owner FROM account_owners WHERE account_id='a'"
+    ).fetchone() is None
+    connection.close()
