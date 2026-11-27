@@ -16,9 +16,13 @@ import os
 import secrets
 import sqlite3
 import time
+import traceback
+import uuid
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import date
+from datetime import datetime, timezone
+from pathlib import Path
 
 from dotenv import load_dotenv
 from flask import (
@@ -52,6 +56,42 @@ app.config["BUDGET_STAGING"] = os.environ.get("BUDGET_STAGING", "").strip().lowe
 }
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+_server_errors = {}
+_server_errors_lock = __import__("threading").Lock()
+
+
+def _reports_dir():
+    return Path(os.environ.get("BUDGET_REPORTS_DIR", Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "budget" / "reports"))
+
+
+def _app_version():
+    try:
+        from importlib.metadata import version
+        return version("budget")
+    except Exception:
+        return "0.2.0"
+
+
+@app.context_processor
+def inject_report_context():
+    return {"app_version": _app_version()}
+
+
+@app.errorhandler(500)
+def server_error(error):
+    original = getattr(error, "original_exception", None)
+    error_id = uuid.uuid4().hex
+    if original is not None:
+        record = {
+            "message": str(original),
+            "stack_trace": "".join(traceback.format_exception(type(original), original, original.__traceback__)),
+            "request": {"method": request.method, "path": request.path, "url": request.url},
+        }
+        with _server_errors_lock:
+            _server_errors[error_id] = record
+            while len(_server_errors) > 100:
+                _server_errors.pop(next(iter(_server_errors)))
+    return render_template("server_error.html", error_id=error_id), 500
 
 
 @app.after_request
@@ -282,6 +322,72 @@ def load_sqlite_monthly_trends() -> dict:
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
+
+
+@app.route("/report-problem", methods=["GET", "POST"])
+def report_problem():
+    if request.method == "GET":
+        error_id = request.args.get("error_id", "")
+        with _server_errors_lock:
+            server_error_context = _server_errors.get(error_id)
+        return render_template(
+            "report_problem.html", error_id=error_id,
+            server_error_context=server_error_context,
+            draft_id=uuid.uuid4().hex,
+            draft_timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+    try:
+        submitted = json.loads(request.form.get("report_json", "{}"))
+    except (TypeError, ValueError):
+        abort(400)
+    if not isinstance(submitted, dict) or not isinstance(submitted.get("description"), str) or not submitted["description"].strip():
+        abort(400)
+    draft_id = submitted.get("report_id", "")
+    report_id = draft_id if isinstance(draft_id, str) and len(draft_id) == 32 and all(c in "0123456789abcdef" for c in draft_id) else uuid.uuid4().hex
+    draft_timestamp = submitted.get("timestamp", "")
+    report = {
+        "id": report_id,
+        "timestamp": draft_timestamp if isinstance(draft_timestamp, str) else datetime.now(timezone.utc).isoformat(),
+        "app_version": _app_version(),
+        "description": submitted.get("description", "").strip(),
+        "expected": submitted.get("expected", "").strip() if isinstance(submitted.get("expected", ""), str) else "",
+        "reproduction_steps": submitted.get("reproduction_steps", "").strip() if isinstance(submitted.get("reproduction_steps", ""), str) else "",
+        "diagnostics": submitted.get("diagnostics", {}) if isinstance(submitted.get("diagnostics", {}), dict) else {},
+        "server_error": None,
+    }
+    error_id = submitted.get("server_error_id")
+    with _server_errors_lock:
+        report["server_error"] = _server_errors.pop(error_id, None)
+    directory = _reports_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / f"{report_id}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    return render_template("report_submitted.html", report_id=report_id)
+
+
+@app.get("/admin/reports")
+def list_problem_reports():
+    reports = []
+    directory = _reports_dir()
+    if directory.exists():
+        for path in sorted(directory.glob("*.json"), reverse=True):
+            try:
+                report = json.loads(path.read_text(encoding="utf-8"))
+                reports.append({"id": report.get("id", path.stem), "timestamp": report.get("timestamp", ""), "description": report.get("description", "")})
+            except (OSError, ValueError):
+                logger.warning("Skipping unreadable problem report %s", path.name)
+    return render_template("problem_reports.html", reports=reports)
+
+
+@app.get("/admin/reports/<report_id>")
+def view_problem_report(report_id):
+    if not report_id.isalnum():
+        abort(404)
+    path = _reports_dir() / f"{report_id}.json"
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        abort(404)
+    return render_template("problem_report_detail.html", report=report)
 
 
 @app.route("/")

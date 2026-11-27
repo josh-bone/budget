@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import threading
 import time
@@ -201,6 +202,63 @@ def test_refresh_rejects_cross_origin_post():
 
 def test_refresh_requires_origin_or_referer():
     assert web_app.app.test_client().post("/refresh").status_code == 403
+
+
+def test_problem_report_is_saved_locally_and_reviewable(tmp_path, monkeypatch):
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setenv("BUDGET_REPORTS_DIR", str(reports_dir))
+    client = web_app.app.test_client()
+
+    response = client.post(
+        "/report-problem",
+        data={
+            "report_json": json.dumps(
+                {
+                    "report_id": "a" * 32,
+                    "timestamp": "2026-11-27T12:00:00+00:00",
+                    "description": "The chart failed.",
+                    "expected": "A chart should appear.",
+                    "reproduction_steps": "Open overview.",
+                    "diagnostics": {"url": "http://localhost/?month=2026-11"},
+                }
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    assert b"a" * 32 in response.data
+    saved = json.loads((reports_dir / f"{'a' * 32}.json").read_text())
+    assert saved["description"] == "The chart failed."
+    assert saved["expected"] == "A chart should appear."
+    assert saved["diagnostics"]["url"].endswith("?month=2026-11")
+    assert b"The chart failed." in client.get("/admin/reports").data
+    assert b"A chart should appear." in client.get(f"/admin/reports/{'a' * 32}").data
+
+
+def test_problem_report_requires_description():
+    response = web_app.app.test_client().post(
+        "/report-problem", data={"report_json": '{"description":"  "}'}
+    )
+
+    assert response.status_code == 400
+
+
+def test_report_form_and_server_error_link_include_associated_context():
+    client = web_app.app.test_client()
+    form = client.get("/report-problem?error_id=error-123")
+    assert form.status_code == 200
+    assert b"Review before submitting" in form.data
+    assert b"transaction, balance, or account records" in form.data
+
+    with web_app._server_errors_lock:
+        web_app._server_errors["error-123"] = {
+            "message": "database unavailable",
+            "stack_trace": "Traceback (most recent call last): ...",
+            "request": {"path": "/balances"},
+        }
+    form = client.get("/report-problem?error_id=error-123")
+    assert b"database unavailable" in form.data
+    assert b"Traceback" in form.data
 
 
 def test_sort_key_orders_month_tabs_and_places_invalid_names_first():

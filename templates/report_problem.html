@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Report a Problem · Budget{% endblock %}
+{% block content %}
+<main class="wrap" id="report-page" data-server-error='{{ (server_error_context or {}) | tojson | e }}' data-report-id="{{ draft_id }}" data-timestamp="{{ draft_timestamp }}">
+  <header><p class="eyebrow">Private household app</p><h1>Report a Problem</h1></header>
+  <p>Reports are saved on this app server for the owner to review. Nothing is sent to an external service. The report includes this page and URL, browser details, recent client errors, app version, and any associated server error and stack trace. It never attaches transaction, balance, or account records.</p>
+  <form id="problem-form" class="problem-form" method="post">
+    <label for="description">What went wrong? <strong aria-hidden="true">*</strong></label>
+    <textarea id="description" required rows="5"></textarea>
+    <label for="expected">What did you expect to happen?</label>
+    <textarea id="expected" rows="3"></textarea>
+    <label for="reproduction">Steps to reproduce (optional)</label>
+    <textarea id="reproduction" rows="4"></textarea>
+    <input type="hidden" id="server-error-id" value="{{ error_id }}">
+    <input type="hidden" name="report_json" id="report-json">
+    <h2>Review before submitting</h2>
+    <p>The assembled report is shown below. Check it before saving.</p>
+    <pre id="report-preview" tabindex="0" aria-live="polite"></pre>
+    <button type="submit">Save report on this server</button>
+  </form>
+</main>
+{% endblock %}

@@ -34,6 +34,11 @@
 
 ## Unreleased
 
+### Added
+
+- Added a shared Report a Problem form with a reviewable diagnostic report, local server storage, report IDs, and owner review pages.
+- Associated server error pages with reportable exception messages and stack traces.
+
 ## v0.1.0
 
 ### Added

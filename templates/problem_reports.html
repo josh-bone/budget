@@ -1,0 +1,3 @@
+{% extends "base.html" %}
+{% block title %}Problem Reports · Budget{% endblock %}
+{% block content %}<main class="wrap"><h1>Problem Reports</h1>{% if reports %}<ul>{% for report in reports %}<li><a href="{{ url_for('view_problem_report', report_id=report.id) }}">{{ report.id }}</a> · {{ report.timestamp }} · {{ report.description }}</li>{% endfor %}</ul>{% else %}<p>No reports have been submitted.</p>{% endif %}</main>{% endblock %}

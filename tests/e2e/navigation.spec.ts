@@ -32,3 +32,10 @@ test('shared navigation stays aligned and marks the current page', async ({ page
     }
   }
 });
+
+test('Report a Problem stays available in the shared page footer', async ({ page }) => {
+  for (const destination of pages) {
+    await page.goto(destination.path);
+    await expect(page.locator('.site-footer').getByRole('link', { name: 'Report a Problem' })).toBeVisible();
+  }
+});

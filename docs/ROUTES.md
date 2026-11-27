@@ -7,6 +7,9 @@
 | `GET /transfers` | Page | Pair-matching suggestions, rejection/approval controls, and manually approved transfers that can be unmarked. |
 | `GET /rules` | Page | Category and categorization-rule editor. |
 | `GET /balances` | Page | Latest per-account balances and net-worth history; optional `source=manual | simplefin`. |
+| `GET /report-problem` | Page | Review and submit a local problem report with browser and runtime context; accepts `error_id` from the server error page. |
+| `POST /report-problem` | Form action | Save a report under the app data directory; default `~/.local/share/budget/reports` or `BUDGET_REPORTS_DIR`. |
+| `GET /admin/reports`, `/admin/reports/<id>` | Page | List and inspect locally stored reports, including associated server stack traces. |
 | `GET /month/<sheet_name>` | Legacy page | Google Sheets month detail. Requires Sheets credentials and configuration. |
 | `POST /refresh` | Legacy action | Redirects to `/balances`; no longer refreshes the overview. |
 | `GET /api/balances/trend` | JSON | Balance history points, optionally filtered by `source`. |
