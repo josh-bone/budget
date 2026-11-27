@@ -8,13 +8,13 @@ import re
 import httplib2
 import pandas as pd
 from google_auth_httplib2 import AuthorizedHttp
-from pandas.api.types import is_string_dtype
+from googleapiclient.discovery import Resource
 
-from budget.utils import cast_to_float
+from budget.utils import parse_money
 
 try:
     from google.oauth2 import service_account
-    from googleapiclient.discovery import Resource, build
+    from googleapiclient.discovery import build
 except ImportError:
     raise ImportError(
         "Missing dependencies. Run:\n"
@@ -63,15 +63,8 @@ def get_balances_df(service: Resource, spreadsheet_id: str) -> pd.DataFrame:
     ]
     df = pd.DataFrame(rows, columns=columns)
 
-    # Convert Amount to numeric
-    if "Amount" in df.columns and is_string_dtype(df["Amount"]):
-        amount_text = (
-            df["Amount"]
-            .astype("string")
-            .str.replace("$", "", regex=False)
-            .str.replace(",", "", regex=False)
-        )
-        df["Amount"] = pd.to_numeric(amount_text, errors="coerce")
+    if "Amount" in df.columns:
+        df["Amount"] = df["Amount"].map(_parse_money_or_na)
 
     return df
 
@@ -92,9 +85,14 @@ def list_sheet_names(
 
 
 def parse_value(v: str | None) -> float | None:
-    if not v:
+    return parse_money(v)
+
+
+def _parse_money_or_na(value: object) -> float | None:
+    try:
+        return parse_money(value)
+    except ValueError:
         return None
-    return cast_to_float(v)
 
 
 def fetch_cells(

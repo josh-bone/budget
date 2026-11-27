@@ -18,7 +18,7 @@ import sqlite3
 import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
-from urllib.parse import quote, unquote
+from urllib.parse import unquote
 
 from dotenv import load_dotenv
 from flask import (
@@ -76,8 +76,6 @@ def inject_instance_mode():
 # Legacy Sheets month-detail concurrency controls.
 _MAX_WORKERS = max(1, int(os.environ.get("BUDGET_FETCH_WORKERS", 6)))
 _RESULT_TIMEOUT = max(1, int(os.environ.get("BUDGET_RESULT_TIMEOUT", 20)))
-
-app.jinja_env.filters["urlencode"] = quote
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 

@@ -3,9 +3,6 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-DEFAULT_LOCALE = "en_US.UTF-8"
-
-
 class ConfigError(Exception):
     pass
 

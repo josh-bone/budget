@@ -10,6 +10,8 @@ from typing import Any
 
 import pandas as pd
 
+from budget.utils import parse_money
+
 logger = logging.getLogger(__name__)
 
 
@@ -279,10 +281,10 @@ def import_balance_history(
 
         parsed_date = pd.to_datetime(date_value, errors="coerce")
         try:
-            amount = float(str(amount_value).replace("$", "").replace(",", ""))
-        except (TypeError, ValueError):
+            amount = parse_money(amount_value)
+        except ValueError:
             amount = float("nan")
-        if pd.isna(parsed_date) or pd.isna(amount):
+        if pd.isna(parsed_date) or amount is None or pd.isna(amount):
             skipped += 1
             continue
         rows.append(

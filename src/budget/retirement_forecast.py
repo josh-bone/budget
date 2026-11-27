@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 from budget.balances_db import get_balance_history
+from budget.utils import parse_money
 
 logger = logging.getLogger(__name__)
 
@@ -224,22 +225,12 @@ def run_retirement_forecast(
     balances_df: pd.DataFrame | None = None,
     account_patterns: Sequence[str] | None = None,
     contribution_patterns: Sequence[str] | None = None,
+    contribution_fields: Sequence[str] | None = None,
+    summary_keys: Sequence[str] | None = None,
 ) -> RetirementForecastResult:
-    config = config or RetirementForecastConfig(
-        csv_path=csv_path or DEFAULT_CSV_PATH,
-    )
+    config = config or RetirementForecastConfig()
     if csv_path is not None:
-        config = RetirementForecastConfig(
-            csv_path=csv_path,
-            current_age=config.current_age,
-            retirement_age=config.retirement_age,
-            life_expectancy=config.life_expectancy,
-            block_length_months=config.block_length_months,
-            n_simulations=config.n_simulations,
-            random_seed=config.random_seed,
-            target_real_balance=config.target_real_balance,
-            contribution_mode=config.contribution_mode,
-        )
+        config = replace(config, csv_path=csv_path)
 
     history = load_historical_data(config.csv_path)
     rng = np.random.default_rng(config.random_seed)
@@ -258,6 +249,8 @@ def run_retirement_forecast(
         else get_current_retirement_savings_contributions(
             latest_budget=latest_budget,
             contribution_patterns=contribution_patterns,
+            contribution_fields=contribution_fields,
+            summary_keys=summary_keys,
         )
     )
 
@@ -333,18 +326,14 @@ def _find_amount_column(df: pd.DataFrame) -> str | None:
 
 
 def _coerce_amount_series(series: pd.Series) -> pd.Series:
-    if pd.api.types.is_numeric_dtype(series):
-        return series.astype(float)
+    def coerce(value: Any) -> float:
+        try:
+            parsed = parse_money(value)
+            return float(parsed) if parsed is not None else float("nan")
+        except ValueError:
+            return float("nan")
 
-    cleaned = (
-        series.astype(str)
-        .str.replace("$", "", regex=False)
-        .str.replace(",", "", regex=False)
-        .str.replace("(", "-", regex=False)
-        .str.replace(")", "", regex=False)
-        .replace({"None": np.nan, "nan": np.nan, "": np.nan})
-    )
-    return pd.to_numeric(cleaned, errors="coerce")
+    return series.map(coerce).astype(float)
 
 
 def get_total_retirement_savings_balance(

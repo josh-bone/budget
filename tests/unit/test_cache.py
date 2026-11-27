@@ -9,11 +9,6 @@ from budget.cache import BudgetCache
 SAMPLE_DATA = {"1/2026": {"summary": {"net_income": 4000.0}}}
 
 
-def make_cache(**env) -> BudgetCache:
-    """Return a fresh BudgetCache with a controlled environment."""
-    return BudgetCache()
-
-
 # ── Basic get/set/invalidate ───────────────────────────────────────────────────
 
 

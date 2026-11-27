@@ -1,5 +1,6 @@
 import argparse
 import logging
+from dataclasses import replace
 
 from dotenv import load_dotenv
 
@@ -13,17 +14,11 @@ from budget.config import ConfigError, get_env, load_toml
 from budget.display import print_section
 from budget.retirement_forecast import (
     RetirementForecastConfig,
-    get_current_retirement_savings_contributions,
-    get_total_retirement_savings_balance,
     run_retirement_forecast,
 )
-from budget.sheets import (
-    Resource,
-    build_service,
-    fetch_cells,
-    get_balances_df,
-    list_sheet_names,
-)
+from googleapiclient.discovery import Resource
+
+from budget.sheets import build_service, fetch_cells, get_balances_df, list_sheet_names
 from budget.simplefin import claim_setup_token, get_accounts, get_transactions
 
 logger = logging.getLogger(__name__)
@@ -211,17 +206,9 @@ def main():
         return
 
     if args.command == "retirement-forecast":
-        forecast_config = RetirementForecastConfig(
-            csv_path=args.csv_path or RetirementForecastConfig().csv_path,
-            current_age=RetirementForecastConfig().current_age,
-            retirement_age=RetirementForecastConfig().retirement_age,
-            life_expectancy=RetirementForecastConfig().life_expectancy,
-            block_length_months=RetirementForecastConfig().block_length_months,
-            n_simulations=RetirementForecastConfig().n_simulations,
-            random_seed=RetirementForecastConfig().random_seed,
-            target_real_balance=RetirementForecastConfig().target_real_balance,
-            contribution_mode=RetirementForecastConfig().contribution_mode,
-        )
+        forecast_config = RetirementForecastConfig()
+        if args.csv_path:
+            forecast_config = replace(forecast_config, csv_path=args.csv_path)
 
         service: Resource = build_service(key_file)
         sheet_names = list_sheet_names(service, spreadsheet_id, pattern=sheet_pattern)
@@ -265,21 +252,14 @@ def main():
         result = run_retirement_forecast(
             config=forecast_config,
             initial_balance=args.initial_balance
-            if args.initial_balance is not None
-            else get_total_retirement_savings_balance(
-                account_patterns=account_patterns,
-            ),
+            if args.initial_balance is not None else None,
             monthly_contribution=args.monthly_contribution
-            if args.monthly_contribution is not None
-            else get_current_retirement_savings_contributions(
-                latest_budget=latest_budget,
-                contribution_patterns=contribution_patterns,
-                contribution_fields=contribution_fields,
-                summary_keys=summary_keys,
-            ),
+            if args.monthly_contribution is not None else None,
             latest_budget=latest_budget,
             account_patterns=account_patterns,
             contribution_patterns=contribution_patterns,
+            contribution_fields=contribution_fields,
+            summary_keys=summary_keys,
         )
 
         print("\nRETIREMENT FORECAST")
