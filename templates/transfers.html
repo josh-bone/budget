@@ -9,7 +9,7 @@
 </style>{% endblock %}
 {% block content %}
 <main class="transfer-page">
-  <nav class="transfer-nav" aria-label="Main navigation"><a href="/">Budget</a><a href="/transactions">Transactions</a><a href="/balances">Balances</a><a href="/rules">Categories &amp; Rules</a></nav>
+  <nav class="transfer-nav" aria-label="Main navigation"><a href="/">Budget</a><a href="/transactions">Transactions</a><a href="/balances">Balances</a><a href="/accounts">Accounts</a><a href="/rules">Categories &amp; Rules</a></nav>
   {% for category,message in get_flashed_messages(with_categories=true) %}<p class="transfer-flash {{ category }}" role="status">{{ message }}</p>{% endfor %}
   <header><p class="meta">Review</p><h1>Suggested transfers</h1><p class="transfer-intro">Possible pairs match opposite amounts across accounts within 10 days. Ambiguous matches are shown as separate choices; suggestions never change categories by themselves.</p></header>
 

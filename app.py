@@ -403,6 +403,89 @@ def balances():
     )
 
 
+@app.get("/accounts")
+def accounts():
+    """List imported and balance-tracked accounts with their latest snapshot."""
+    error = None
+    account_rows = []
+    connection = _connect()
+    try:
+        rows = connection.execute(
+            """WITH names AS (
+                   SELECT id, name FROM accounts
+                   UNION
+                   SELECT NULL, account AS name FROM balance_snapshots s
+                   WHERE NOT EXISTS (SELECT 1 FROM accounts a WHERE a.name=s.account)
+               ), latest AS (
+                   SELECT account, date, amount, source,
+                          ROW_NUMBER() OVER (PARTITION BY account ORDER BY date DESC) AS row_num
+                   FROM balance_snapshots
+               )
+               SELECT n.id, n.name, l.date, l.amount, l.source
+               FROM names n LEFT JOIN latest l ON l.account=n.name AND l.row_num=1
+               GROUP BY n.id, n.name
+               ORDER BY n.name COLLATE NOCASE, n.id"""
+        ).fetchall()
+        aliases = {}
+        for account_id, alias in connection.execute(
+            "SELECT account_key, alias FROM account_aliases ORDER BY alias COLLATE NOCASE"
+        ):
+            aliases.setdefault(account_id, []).append(alias)
+        for account_id, name, date_value, amount, source in rows:
+            account_rows.append({
+                "id": account_id,
+                "name": name,
+                "date": date_value,
+                "amount": amount,
+                "source": source or ("SimpleFIN" if account_id else None),
+                "key": account_id or f"snapshot:{name}",
+                "aliases": aliases.get(account_id or f"snapshot:{name}", []),
+            })
+    except Exception:
+        logger.exception("Failed to load accounts from SQLite")
+        error = "Unable to load accounts. Check the application logs for details."
+    finally:
+        connection.close()
+    return render_template("accounts.html", accounts=account_rows, error=error)
+
+
+@app.post("/accounts/aliases")
+def save_account_aliases():
+    """Replace an imported account's comma-separated aliases."""
+    submitted = request.form.get("aliases", "")
+    account_key = request.form.get("account_key", "")
+    alias_values = list(dict.fromkeys(
+        value.strip() for value in submitted.split(",") if value.strip()
+    ))
+    connection = _connect()
+    try:
+        if not account_key:
+            abort(404)
+        if account_key.startswith("snapshot:"):
+            exists = connection.execute(
+                "SELECT 1 FROM balance_snapshots WHERE account=? LIMIT 1",
+                (account_key.removeprefix("snapshot:"),),
+            ).fetchone()
+        else:
+            exists = connection.execute(
+                "SELECT 1 FROM accounts WHERE id=?", (account_key,)
+            ).fetchone()
+        if not exists:
+            abort(404)
+        connection.execute("DELETE FROM account_aliases WHERE account_key=?", (account_key,))
+        connection.executemany(
+            "INSERT INTO account_aliases (account_key, alias) VALUES (?, ?)",
+            [(account_key, alias) for alias in alias_values],
+        )
+        connection.commit()
+    except sqlite3.IntegrityError:
+        connection.rollback()
+        flash("Aliases must be unique for this account.", "error")
+    finally:
+        connection.close()
+    return redirect(url_for("accounts"))
+
+
 @app.get("/api/balances/trend")
 def balances_trend():
     source_filter = request.args.get("source", "all").lower()

@@ -55,6 +55,11 @@ def _connect(db_path: str | os.PathLike[str] | None = None) -> sqlite3.Connectio
             name TEXT NOT NULL
         )
     """)
+    connection.execute("""CREATE TABLE IF NOT EXISTS account_aliases (
+        account_key TEXT NOT NULL,
+        alias TEXT NOT NULL COLLATE NOCASE,
+        PRIMARY KEY (account_key, alias)
+    )""")
     connection.execute("""CREATE TABLE IF NOT EXISTS account_owners (
         account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON UPDATE CASCADE ON DELETE CASCADE,
         owner TEXT NOT NULL
