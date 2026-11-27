@@ -405,41 +405,37 @@ def balances():
 
 @app.get("/accounts")
 def accounts():
-    """List imported and balance-tracked accounts with their latest snapshot."""
+    """List canonical accounts with their latest directly named or aliased snapshot."""
     error = None
     account_rows = []
     connection = _connect()
     try:
         rows = connection.execute(
-            """WITH names AS (
-                   SELECT id, name FROM accounts
-                   UNION
-                   SELECT NULL, account AS name FROM balance_snapshots s
-                   WHERE NOT EXISTS (SELECT 1 FROM accounts a WHERE a.name=s.account)
-               ), latest AS (
-                   SELECT account, date, amount, source,
-                          ROW_NUMBER() OVER (PARTITION BY account ORDER BY date DESC) AS row_num
-                   FROM balance_snapshots
-               )
-               SELECT n.id, n.name, l.date, l.amount, l.source
-               FROM names n LEFT JOIN latest l ON l.account=n.name AND l.row_num=1
-               GROUP BY n.id, n.name
-               ORDER BY n.name COLLATE NOCASE, n.id"""
+            "SELECT id, name FROM accounts ORDER BY name COLLATE NOCASE"
         ).fetchall()
         aliases = {}
         for account_id, alias in connection.execute(
             "SELECT account_key, alias FROM account_aliases ORDER BY alias COLLATE NOCASE"
         ):
             aliases.setdefault(account_id, []).append(alias)
-        for account_id, name, date_value, amount, source in rows:
+        snapshots = connection.execute(
+            "SELECT account, date, amount, source FROM balance_snapshots ORDER BY date DESC"
+        ).fetchall()
+        for account_id, name in rows:
+            names = {name.casefold(), *(alias.casefold() for alias in aliases.get(account_id, []))}
+            latest = next((row for row in snapshots if row[0].casefold() in names), None)
+            date_value, amount, source = latest[1:] if latest else (None, None, None)
             account_rows.append({
                 "id": account_id,
                 "name": name,
                 "date": date_value,
                 "amount": amount,
-                "source": source or ("SimpleFIN" if account_id else None),
-                "key": account_id or f"snapshot:{name}",
-                "aliases": aliases.get(account_id or f"snapshot:{name}", []),
+                "source": {
+                    "manual": "Google Sheets / manual",
+                    "simplefin": "SimpleFIN",
+                }.get(source, source) or ("Manually added" if account_id.startswith("manual:") else "SimpleFIN"),
+                "key": account_id,
+                "aliases": aliases.get(account_id, []),
             })
     except Exception:
         logger.exception("Failed to load accounts from SQLite")
@@ -449,29 +445,73 @@ def accounts():
     return render_template("accounts.html", accounts=account_rows, error=error)
 
 
+@app.post("/accounts")
+def create_account():
+    """Create a canonical account that may have no SimpleFIN connection."""
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash("Enter an account name.", "error")
+        return redirect(url_for("accounts"))
+    connection = _connect()
+    try:
+        if connection.execute(
+            "SELECT 1 FROM accounts WHERE name=? COLLATE NOCASE", (name,)
+        ).fetchone():
+            flash("An account with that name already exists.", "error")
+        elif connection.execute(
+            "SELECT 1 FROM account_aliases WHERE alias=? COLLATE NOCASE", (name,)
+        ).fetchone():
+            flash("That name is already an alias for another account.", "error")
+        else:
+            import uuid
+
+            connection.execute(
+                "INSERT INTO accounts (id, name) VALUES (?, ?)",
+                (f"manual:{uuid.uuid4()}", name),
+            )
+            connection.commit()
+            flash("Account added.", "success")
+    finally:
+        connection.close()
+    return redirect(url_for("accounts"))
+
+
 @app.post("/accounts/aliases")
 def save_account_aliases():
     """Replace an imported account's comma-separated aliases."""
     submitted = request.form.get("aliases", "")
     account_key = request.form.get("account_key", "")
-    alias_values = list(dict.fromkeys(
-        value.strip() for value in submitted.split(",") if value.strip()
-    ))
+    alias_values = []
+    seen_aliases = set()
+    for value in submitted.split(","):
+        alias = value.strip()
+        if alias and alias.casefold() not in seen_aliases:
+            alias_values.append(alias)
+            seen_aliases.add(alias.casefold())
     connection = _connect()
     try:
         if not account_key:
             abort(404)
-        if account_key.startswith("snapshot:"):
-            exists = connection.execute(
-                "SELECT 1 FROM balance_snapshots WHERE account=? LIMIT 1",
-                (account_key.removeprefix("snapshot:"),),
-            ).fetchone()
-        else:
-            exists = connection.execute(
-                "SELECT 1 FROM accounts WHERE id=?", (account_key,)
-            ).fetchone()
+        exists = connection.execute(
+            "SELECT 1 FROM accounts WHERE id=?", (account_key,)
+        ).fetchone()
         if not exists:
             abort(404)
+        for alias in alias_values:
+            conflicting = connection.execute(
+                """SELECT 1 FROM account_aliases WHERE alias=? COLLATE NOCASE
+                   AND account_key != ? LIMIT 1""",
+                (alias, account_key),
+            ).fetchone()
+            if conflicting:
+                flash("An alias is already assigned to another account.", "error")
+                return redirect(url_for("accounts"))
+            if connection.execute(
+                "SELECT 1 FROM accounts WHERE name=? COLLATE NOCASE AND id != ?",
+                (alias, account_key),
+            ).fetchone():
+                flash("An alias cannot match another account's canonical name.", "error")
+                return redirect(url_for("accounts"))
         connection.execute("DELETE FROM account_aliases WHERE account_key=?", (account_key,))
         connection.executemany(
             "INSERT INTO account_aliases (account_key, alias) VALUES (?, ?)",
@@ -484,6 +524,43 @@ def save_account_aliases():
     finally:
         connection.close()
     return redirect(url_for("accounts"))
+
+
+@app.post("/attention/map-sheet-account")
+def map_sheet_account():
+    """Save an unmatched sheet label as an alias of an existing canonical account."""
+    sheet_name = request.form.get("sheet_name", "").strip()
+    account_id = request.form.get("account_id", "")
+    connection = _connect()
+    try:
+        if not sheet_name or not connection.execute(
+            "SELECT 1 FROM balance_snapshots WHERE account=? AND source='manual' LIMIT 1",
+            (sheet_name,),
+        ).fetchone():
+            abort(404)
+        if not connection.execute("SELECT 1 FROM accounts WHERE id=?", (account_id,)).fetchone():
+            abort(404)
+        existing = connection.execute(
+            "SELECT account_key FROM account_aliases WHERE alias=? COLLATE NOCASE",
+            (sheet_name,),
+        ).fetchone()
+        if connection.execute(
+            "SELECT 1 FROM accounts WHERE id=? AND name=? COLLATE NOCASE",
+            (account_id, sheet_name),
+        ).fetchone():
+            flash("That sheet name already matches the selected account.", "error")
+        elif existing and existing[0] != account_id:
+            flash("That sheet name is already an alias for another account.", "error")
+        else:
+            connection.execute(
+                "INSERT OR IGNORE INTO account_aliases (account_key, alias) VALUES (?, ?)",
+                (account_id, sheet_name),
+            )
+            connection.commit()
+            flash(f"‘{sheet_name}’ now matches the selected account.", "success")
+    finally:
+        connection.close()
+    return redirect(url_for("attention", _anchor="accounts"))
 
 
 @app.get("/api/balances/trend")
@@ -1167,10 +1244,26 @@ def transaction_spend():
 
 
 @app.get("/transfers")
-def transfers():
+@app.get("/attention")
+def attention():
     connection = _connect()
     try:
         suggestions = suggest_transfer_pairs(connection)
+        unmatched_sheet_names = connection.execute(
+            """SELECT s.account, MAX(s.date), COUNT(*),
+                      (SELECT latest.amount FROM balance_snapshots latest
+                       WHERE latest.account=s.account AND latest.source='manual'
+                       ORDER BY latest.date DESC LIMIT 1)
+               FROM balance_snapshots s
+               WHERE s.source='manual'
+                 AND NOT EXISTS (SELECT 1 FROM accounts a WHERE a.name=s.account COLLATE NOCASE)
+                 AND NOT EXISTS (SELECT 1 FROM account_aliases aa
+                                 WHERE aa.alias=s.account COLLATE NOCASE)
+               GROUP BY s.account ORDER BY s.account COLLATE NOCASE"""
+        ).fetchall()
+        canonical_accounts = connection.execute(
+            "SELECT id, name FROM accounts ORDER BY name COLLATE NOCASE"
+        ).fetchall()
         flagged_ids = {
             row[0]
             for row in connection.execute(
@@ -1199,6 +1292,11 @@ def transfers():
     return render_template(
         "transfers.html",
         suggestions=suggestions,
+        unmatched_sheet_names=[
+            {"name": row[0], "latest_date": row[1], "count": row[2], "amount": row[3]}
+            for row in unmatched_sheet_names
+        ],
+        canonical_accounts=canonical_accounts,
         transfer_categories=transfer_categories,
         approved=[
             {
@@ -1254,7 +1352,7 @@ def approve_transfer():
             or _posted_transfer_suggestion(connection, source, candidate) is None
         ):
             flash("That transfer suggestion is no longer available.", "error")
-            return redirect(url_for("transfers"))
+            return redirect(url_for("attention"))
         try:
             category_id = int(request.form.get("category_id", ""))
         except ValueError:
@@ -1265,7 +1363,7 @@ def approve_transfer():
             (category_id,),
         ).fetchone():
             flash("Choose a transfer category before approving.", "error")
-            return redirect(url_for("transfers"))
+            return redirect(url_for("attention"))
         for transaction in (source, candidate):
             cursor = connection.execute(
                 """UPDATE transactions
@@ -1278,12 +1376,12 @@ def approve_transfer():
                 flash(
                     "That transfer suggestion changed. Please review it again.", "error"
                 )
-                return redirect(url_for("transfers"))
+                return redirect(url_for("attention"))
         connection.commit()
         flash("Transfer approved and categorized.", "success")
     finally:
         connection.close()
-    return redirect(url_for("transfers"))
+    return redirect(url_for("attention"))
 
 
 @app.post("/transfers/reject")
@@ -1296,7 +1394,7 @@ def reject_transfer():
             or _posted_transfer_suggestion(connection, source, candidate) is None
         ):
             flash("That transfer suggestion is no longer available.", "error")
-            return redirect(url_for("transfers"))
+            return redirect(url_for("attention"))
         account_id_a, transaction_id_a, account_id_b, transaction_id_b = (
             transfer_pair_key(source, candidate)
         )
@@ -1310,7 +1408,7 @@ def reject_transfer():
         flash("Transfer suggestion rejected.", "success")
     finally:
         connection.close()
-    return redirect(url_for("transfers"))
+    return redirect(url_for("attention"))
 
 
 @app.post("/transfers/unmark")
@@ -1343,7 +1441,7 @@ def unmark_transfer():
             flash("Transfer returned to automatic categorization.", "success")
     finally:
         connection.close()
-    return redirect(url_for("transfers"))
+    return redirect(url_for("attention"))
 
 
 @app.post("/transactions/<account_id>/<transaction_id>/category")

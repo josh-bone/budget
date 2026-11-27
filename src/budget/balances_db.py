@@ -325,14 +325,28 @@ def import_balance_history(
 def get_balance_history(
     *, db_path: str | os.PathLike[str] | None = None
 ) -> pd.DataFrame:
-    """Return history as Date, Account, Amount, Source columns, ordered by date."""
+    """Return history under canonical account names when a name or alias matches."""
     connection = _connect(db_path)
     try:
         rows = connection.execute(
             "SELECT date, account, amount, source FROM balance_snapshots ORDER BY date, account"
         ).fetchall()
+        canonical_names = {
+            account_id: name
+            for account_id, name in connection.execute("SELECT id, name FROM accounts")
+        }
+        name_map = {name.casefold(): name for name in canonical_names.values()}
+        for account_id, alias in connection.execute(
+            "SELECT account_key, alias FROM account_aliases"
+        ):
+            if account_id in canonical_names:
+                name_map[alias.casefold()] = canonical_names[account_id]
     finally:
         connection.close()
+    rows = [
+        (date_value, name_map.get(account.casefold(), account), amount, source)
+        for date_value, account, amount, source in rows
+    ]
     return pd.DataFrame(rows, columns=["Date", "Account", "Amount", "Source"])
 
 

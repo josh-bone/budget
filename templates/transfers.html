@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Transfer Review · Budget{% endblock %}
+{% block title %}Attention Needed · Budget{% endblock %}
 {% block page_head %}<style>
   .transfer-page{max-width:1180px;margin:0 auto;padding:24px 24px 64px;color:#202b36;font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
   .transfer-nav{display:flex;gap:18px;border-bottom:1px solid #dce3e9;padding:0 0 14px;margin-bottom:26px}.transfer-nav a{color:#245e86;text-decoration:none}
@@ -9,12 +9,20 @@
 </style>{% endblock %}
 {% block content %}
 <main class="transfer-page">
-  <nav class="transfer-nav" aria-label="Main navigation"><a href="/">Budget</a><a href="/transactions">Transactions</a><a href="/balances">Balances</a><a href="/accounts">Accounts</a><a href="/rules">Categories &amp; Rules</a></nav>
+  <nav class="transfer-nav" aria-label="Main navigation"><a href="/">Budget</a><a href="/transactions">Transactions</a><a href="/balances">Balances</a><a href="/accounts">Accounts</a><a href="/attention">Attention Needed</a><a href="/rules">Categories &amp; Rules</a></nav>
   {% for category,message in get_flashed_messages(with_categories=true) %}<p class="transfer-flash {{ category }}" role="status">{{ message }}</p>{% endfor %}
-  <header><p class="meta">Review</p><h1>Suggested transfers</h1><p class="transfer-intro">Possible pairs match opposite amounts across accounts within 10 days. Ambiguous matches are shown as separate choices; suggestions never change categories by themselves.</p></header>
+  <header><p class="meta">Review</p><h1>Attention Needed</h1><p class="transfer-intro">Review balance names that need an account match and possible transfer pairs.</p></header>
 
+  <section id="accounts"><h2>Unmatched Google Sheets accounts · {{ unmatched_sheet_names|length }}</h2>
+    <p class="muted">These sheet labels do not match a canonical account name or alias. Match each label to an existing account; this will save the label as an alias. No account is created automatically.</p>
+    {% for item in unmatched_sheet_names %}<article class="transfer-card"><div class="pair"><div class="side"><strong>{{ item.name }}</strong><span class="meta">{{ item.count }} snapshot{{ '' if item.count == 1 else 's' }} · latest {{ item.latest_date }}</span></div><div class="side"><strong>Latest balance</strong><span class="meta">{% if item.amount is not none %}${{ '{:,.2f}'.format(item.amount) }}{% else %}—{% endif %}</span></div></div>
+      {% if canonical_accounts %}<form class="actions" method="post" action="{{ url_for('map_sheet_account') }}"><input type="hidden" name="sheet_name" value="{{ item.name }}"><label>Match to canonical account<select name="account_id" required><option value="" selected disabled>Choose an account</option>{% for id,name in canonical_accounts %}<option value="{{ id }}">{{ name }}</option>{% endfor %}</select></label><button type="submit">Save match</button></form>{% else %}<p class="meta">Add a canonical account on the <a href="{{ url_for('accounts') }}">Accounts page</a> before matching this name.</p>{% endif %}
+    </article>{% else %}<p class="muted">No unmatched Google Sheets account names.</p>{% endfor %}
+  </section>
+
+  <section id="transfers"><h2>Suggested transfers · {{ suggestions|length }}</h2>
+  <p class="muted">Possible pairs match opposite amounts across accounts within 10 days. Suggestions never change categories by themselves.</p>
   {% if not transfer_categories %}<p class="transfer-flash error">Flag a category as a transfer category on <a href="{{ url_for('rules') }}">Categories &amp; Rules</a> before approving suggestions.</p>{% endif %}
-  <h2>Possible pairs · {{ suggestions|length }}</h2>
   {% for pair in suggestions %}
   <article class="transfer-card">
     <div class="pair">
@@ -35,6 +43,7 @@
     </div>
   </article>
   {% else %}<p class="muted">No transfer pairs need review.</p>{% endfor %}
+  </section>
 
   <h2>Approved transfers · {{ approved|length }}</h2>
   {% if approved %}<table class="approved"><thead><tr><th>Date</th><th>Account</th><th>Description</th><th>Amount</th><th>Category</th><th></th></tr></thead><tbody>
