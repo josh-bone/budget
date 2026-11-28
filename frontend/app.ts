@@ -76,7 +76,7 @@ function drawPie(canvas: HTMLCanvasElement, categories: SpendCategory[]): void {
     if (pointerAngle < 0) pointerAngle += Math.PI * 2;
     let sliceEnd = 0;
     const category = categories.find((item) => {
-      sliceEnd += item.amount / total * Math.PI * 2;
+      sliceEnd += (item.amount / total) * Math.PI * 2;
       return pointerAngle < sliceEnd;
     });
     if (!category) return;
@@ -112,16 +112,18 @@ async function refreshSpend(section: HTMLElement): Promise<void> {
   if (data.breakdown.length) {
     const list = legend ?? document.createElement("ul");
     list.className = "legend";
-    list.replaceChildren(...data.breakdown.map((item) => {
-      const entry = document.createElement("li");
-      const swatch = document.createElement("span");
-      swatch.className = "swatch";
-      swatch.style.backgroundColor = item.color;
-      const label = document.createElement("span");
-      label.textContent = `${item.name}: $${money(item.amount)} (${item.percent.toFixed(1)}%)`;
-      entry.append(swatch, label);
-      return entry;
-    }));
+    list.replaceChildren(
+      ...data.breakdown.map((item) => {
+        const entry = document.createElement("li");
+        const swatch = document.createElement("span");
+        swatch.className = "swatch";
+        swatch.style.backgroundColor = item.color;
+        const label = document.createElement("span");
+        label.textContent = `${item.name}: $${money(item.amount)} (${item.percent.toFixed(1)}%)`;
+        entry.append(swatch, label);
+        return entry;
+      }),
+    );
     if (!legend) empty?.replaceWith(list);
   } else if (!empty) {
     const message = document.createElement("p");
@@ -139,15 +141,21 @@ function initCategoryDropdown(): void {
   const checkboxes = Array.from(dropdown.querySelectorAll<HTMLInputElement>(".cat-cb"));
   const sync = (): void => {
     const checked = checkboxes.filter((checkbox) => checkbox.checked);
-    summary.textContent = checked.length === 0 ? "All categories"
-      : checked.length === checkboxes.length ? `All (${checked.length})`
-      : checked.length === 1 ? checked[0]!.parentElement!.textContent!.trim()
-      : `${checked.length} selected`;
+    summary.textContent =
+      checked.length === 0
+        ? "All categories"
+        : checked.length === checkboxes.length
+          ? `All (${checked.length})`
+          : checked.length === 1
+            ? checked[0]!.parentElement!.textContent!.trim()
+            : `${checked.length} selected`;
     selectAll.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
     selectAll.indeterminate = checked.length > 0 && checked.length < checkboxes.length;
   };
   selectAll.addEventListener("change", () => {
-    checkboxes.forEach((checkbox) => { checkbox.checked = selectAll.checked; });
+    checkboxes.forEach((checkbox) => {
+      checkbox.checked = selectAll.checked;
+    });
     sync();
   });
   checkboxes.forEach((checkbox) => checkbox.addEventListener("change", sync));
@@ -164,16 +172,23 @@ function initDateFilters(): void {
   const end = form?.querySelector<HTMLInputElement>('input[name="end_date"]');
   if (!month || !start || !end) return;
   month.addEventListener("change", () => {
-    if (month.value) { start.value = ""; end.value = ""; }
+    if (month.value) {
+      start.value = "";
+      end.value = "";
+    }
   });
-  const clearMonth = (): void => { if (start.value || end.value) month.value = ""; };
+  const clearMonth = (): void => {
+    if (start.value || end.value) month.value = "";
+  };
   start.addEventListener("change", clearMonth);
   end.addEventListener("change", clearMonth);
 }
 
 function initCategoryEditing(): void {
   document.querySelectorAll<HTMLFormElement>(".category-form, .reset-form").forEach((form) => {
-    form.querySelector<HTMLSelectElement>('select[name="category_id"]')?.addEventListener("change", () => form.requestSubmit());
+    form
+      .querySelector<HTMLSelectElement>('select[name="category_id"]')
+      ?.addEventListener("change", () => form.requestSubmit());
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const row = form.closest<HTMLTableRowElement>("tr");
@@ -187,7 +202,8 @@ function initCategoryEditing(): void {
           body: new FormData(form),
         });
         const result = (await response.json()) as TransactionRow | { error: string };
-        if (!response.ok || "error" in result) throw new Error("error" in result ? result.error : "Update failed");
+        if (!response.ok || "error" in result)
+          throw new Error("error" in result ? result.error : "Update failed");
         row.querySelector(".manual")?.remove();
         if (result.manual) {
           const badge = document.createElement("span");
@@ -199,11 +215,17 @@ function initCategoryEditing(): void {
         const reset = row.querySelector<HTMLFormElement>(".reset-form");
         if (reset) reset.style.display = result.manual ? "inline" : "none";
         const activeCategory = new URLSearchParams(window.location.search).get("category_id");
-        if (activeCategory && (activeCategory === "uncategorized" ? result.category_id !== null
-          : String(result.category_id) !== activeCategory)) row.remove();
+        if (
+          activeCategory &&
+          (activeCategory === "uncategorized"
+            ? result.category_id !== null
+            : String(result.category_id) !== activeCategory)
+        )
+          row.remove();
         if (!document.querySelector("tbody tr")) {
           const body = document.querySelector("tbody");
-          if (body) body.innerHTML = '<tr><td colspan="6">No transactions match these filters.</td></tr>';
+          if (body)
+            body.innerHTML = '<tr><td colspan="6">No transactions match these filters.</td></tr>';
         }
         const count = document.querySelector("body > p.muted");
         if (count && row.isConnected === false) {
@@ -224,43 +246,70 @@ function initTrend(): void {
   const canvas = document.getElementById("net-worth-chart") as HTMLCanvasElement | null;
   const url = canvas?.dataset.trendUrl;
   if (!canvas || !url) return;
-  fetch(url).then((response) => response.json() as Promise<TrendPoint[]>).then((data) => {
-    const context = canvas.getContext("2d");
-    if (!context || !data.length) return;
-    const draw = (): void => {
-      const bounds = canvas.getBoundingClientRect();
-      const scale = window.devicePixelRatio || 1;
-      canvas.width = bounds.width * scale;
-      canvas.height = bounds.height * scale;
-      context.setTransform(scale, 0, 0, scale, 0, 0);
-      const width = bounds.width, height = bounds.height, pad = { left: 60, right: 12, top: 14, bottom: 34 };
-      const values = data.map((point) => point.amount);
-      const min = Math.min(...values), max = Math.max(...values), span = max - min || Math.max(Math.abs(max) * .1, 1);
-      const x = (index: number): number => pad.left + (data.length === 1 ? (width - pad.left - pad.right) / 2 : index * (width - pad.left - pad.right) / (data.length - 1));
-      const y = (value: number): number => pad.top + (max - value + span * .08) * (height - pad.top - pad.bottom) / (span * 1.16);
-      context.clearRect(0, 0, width, height);
-      context.font = "10px DM Mono, monospace";
-      context.fillStyle = "#6b6760";
-      context.strokeStyle = "#d4cfc6";
-      for (let index = 0; index < 4; index++) {
-        const value = min + span * index / 3, yy = y(value);
-        context.beginPath(); context.moveTo(pad.left, yy); context.lineTo(width - pad.right, yy); context.stroke();
-        context.textAlign = "right"; context.fillText(`$${Math.round(value).toLocaleString()}`, pad.left - 8, yy + 3);
-      }
-      context.beginPath();
-      data.forEach((point, index) => index ? context.lineTo(x(index), y(point.amount)) : context.moveTo(x(index), y(point.amount)));
-      context.strokeStyle = "#2c5f8a"; context.lineWidth = 2; context.stroke();
-      data.forEach((point, index) => {
-        context.beginPath(); context.arc(x(index), y(point.amount), 3, 0, Math.PI * 2); context.fillStyle = "#2c5f8a"; context.fill();
-        if (index === 0 || index === data.length - 1 || data.length < 7) {
-          context.fillStyle = "#6b6760"; context.textAlign = index === 0 ? "left" : index === data.length - 1 ? "right" : "center";
-          context.fillText(point.date, x(index), height - 10);
+  fetch(url)
+    .then((response) => response.json() as Promise<TrendPoint[]>)
+    .then((data) => {
+      const context = canvas.getContext("2d");
+      if (!context || !data.length) return;
+      const draw = (): void => {
+        const bounds = canvas.getBoundingClientRect();
+        const scale = window.devicePixelRatio || 1;
+        canvas.width = bounds.width * scale;
+        canvas.height = bounds.height * scale;
+        context.setTransform(scale, 0, 0, scale, 0, 0);
+        const width = bounds.width,
+          height = bounds.height,
+          pad = { left: 60, right: 12, top: 14, bottom: 34 };
+        const values = data.map((point) => point.amount);
+        const min = Math.min(...values),
+          max = Math.max(...values),
+          span = max - min || Math.max(Math.abs(max) * 0.1, 1);
+        const x = (index: number): number =>
+          pad.left +
+          (data.length === 1
+            ? (width - pad.left - pad.right) / 2
+            : (index * (width - pad.left - pad.right)) / (data.length - 1));
+        const y = (value: number): number =>
+          pad.top + ((max - value + span * 0.08) * (height - pad.top - pad.bottom)) / (span * 1.16);
+        context.clearRect(0, 0, width, height);
+        context.font = "10px DM Mono, monospace";
+        context.fillStyle = "#6b6760";
+        context.strokeStyle = "#d4cfc6";
+        for (let index = 0; index < 4; index++) {
+          const value = min + (span * index) / 3,
+            yy = y(value);
+          context.beginPath();
+          context.moveTo(pad.left, yy);
+          context.lineTo(width - pad.right, yy);
+          context.stroke();
+          context.textAlign = "right";
+          context.fillText(`$${Math.round(value).toLocaleString()}`, pad.left - 8, yy + 3);
         }
-      });
-    };
-    draw();
-    window.addEventListener("resize", draw);
-  });
+        context.beginPath();
+        data.forEach((point, index) =>
+          index
+            ? context.lineTo(x(index), y(point.amount))
+            : context.moveTo(x(index), y(point.amount)),
+        );
+        context.strokeStyle = "#2c5f8a";
+        context.lineWidth = 2;
+        context.stroke();
+        data.forEach((point, index) => {
+          context.beginPath();
+          context.arc(x(index), y(point.amount), 3, 0, Math.PI * 2);
+          context.fillStyle = "#2c5f8a";
+          context.fill();
+          if (index === 0 || index === data.length - 1 || data.length < 7) {
+            context.fillStyle = "#6b6760";
+            context.textAlign =
+              index === 0 ? "left" : index === data.length - 1 ? "right" : "center";
+            context.fillText(point.date, x(index), height - 10);
+          }
+        });
+      };
+      draw();
+      window.addEventListener("resize", draw);
+    });
 }
 
 initCategoryDropdown();
