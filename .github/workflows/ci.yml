@@ -41,10 +41,19 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Typecheck and format check
+      - name: Typecheck frontend
+        run: npx tsc --noEmit
+
+      - name: Verify committed bundle is up to date
         run: |
-          npx tsc --noEmit
-          npx prettier --check .
+          npm run build
+          git diff --exit-code static/js/app.js
+
+      - name: Check template formatting
+        run: uv run djlint templates --check
+
+      - name: Lint templates
+        run: uv run djlint templates --lint
 
   e2e:
     runs-on: ubuntu-latest
