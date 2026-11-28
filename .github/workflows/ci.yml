@@ -33,6 +33,19 @@ jobs:
       - name: Test
         run: uv run pytest
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Typecheck and format check
+        run: |
+          npx tsc --noEmit
+          npx prettier --check .
+
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 30
