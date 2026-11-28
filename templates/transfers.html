@@ -97,7 +97,7 @@
     </section>
     <h2>Approved refunds · {{ approved_refunds|length }}</h2>
     {% if approved_refunds %}<table class="approved"><thead><tr><th>Refund</th><th>Account</th><th>Date</th><th>Purchase</th><th>Amount</th><th></th></tr></thead><tbody>
-      {% for row in approved_refunds %}<tr><td>{{ row[4] }}</td><td>{{ row[2] }}</td><td>{{ row[3] }}</td><td>{{ row[8] }} · {{ row[6] }} · {{ row[7] }}</td><td>+{{ '${:,.2f}'.format(row[5]) }}</td><td><form method="post" action="{{ url_for('undo_refund') }}"><input type="hidden" name="refund_account_id" value="{{ row[0] }}"><input type="hidden" name="refund_transaction_id" value="{{ row[1] }}"><button class="reject">Undo</button></form></td></tr>{% endfor %}
+      {% for row in approved_refunds %}<tr><td>{{ row[4] }}</td><td>{{ row[2] }}</td><td>{{ row[3] }}</td><td>{{ row[8] }} · {{ row[6] }} · {{ row[7] }}</td><td>+{{ '${:,.2f}'.format(row[5]) }}</td><td><form method="post" action="{{ url_for('undo_refund') }}"><input type="hidden" name="refund_account_id" value="{{ row[0] }}"><input type="hidden" name="refund_transaction_id" value="{{ row[1] }}"><button class="reject" type="button">Undo</button></form></td></tr>{% endfor %}
     </tbody></table>{% else %}<p class="muted">No approved refunds.</p>{% endif %}
 
   <h2>Approved transfers · {{ approved|length }}</h2>
