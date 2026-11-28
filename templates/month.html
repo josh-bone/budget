@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Budget · {{ sheet_name }}{% endblock %}
-{% block page_head %}<style>
+{% block page_head %}
+  <style>
     :root {
       --bg:       #f5f1eb;
       --surface:  #ede9e1;
@@ -157,85 +158,89 @@
     @media (max-width: 480px) {
       .summary { grid-template-columns: 1fr; }
     }
-  </style>{% endblock %}
+  </style>
+{% endblock %}
 {% block content %}
-<div class="wrap">
-  <nav>
-    <a class="back-link" href="/">← All months</a>
-    {% if months %}
-    <select class="month-picker" data-month-picker>
-      {% for m in months %}
-      <option value="{{ m }}" data-url="{{ url_for('month_detail', month_slug=m.replace('/', '-', 1)) }}" {% if m == sheet_name %}selected{% endif %}>{{ m }}</option>
-      {% endfor %}
-    </select>
-    {% endif %}
-  </nav>
-
-  <header>
-    <p class="eyebrow">Monthly Detail</p>
-    <h1>{{ sheet_name }}</h1>
-  </header>
-
-  {% if warning %}
-    <div class="error-box" role="status">{{ warning }}</div>
-  {% endif %}
-
-  {% if error %}
-    <div class="error-box">{{ error }}</div>
-
-  {% elif budget %}
-
-    {% set s = budget.get('summary', {}) %}
-    <div class="summary">
-      <div class="summary-cell">
-        <span class="summary-label">Net Income</span>
-        <span class="summary-value">
-          {% if s.net_income is not none %}${{ "%.2f"|format(s.net_income) }}{% else %}—{% endif %}
-        </span>
-      </div>
-      <div class="summary-cell">
-        <span class="summary-label">Total Expenses</span>
-        <span class="summary-value">
-          {% if s.total_expenses is not none %}${{ "%.2f"|format(s.total_expenses) }}{% else %}—{% endif %}
-        </span>
-      </div>
-      <div class="summary-cell">
-        <span class="summary-label">Remaining</span>
-        <span class="summary-value {% if s.diff is not none %}{% if s.diff >= 0 %}positive{% else %}negative{% endif %}{% endif %}">
-          {% if s.diff is not none %}${{ "%.2f"|format(s.diff) }}{% else %}—{% endif %}
-        </span>
-      </div>
-    </div>
-
-    {% for section_name, rows in budget.items() %}
-      {% if section_name != 'summary' and rows is iterable and rows is not string %}
-      <div class="section">
-        <div class="section-header">
-          <span class="section-title">{{ section_name | capitalize }}</span>
-          <div class="section-rule"></div>
-        </div>
-        {% for row in rows %}
-        <div class="row">
-          <span class="row-label">
-            {{ row.label | replace('_', ' ') }}
-            <span class="row-meta">{{ row.cell }}</span>
-          </span>
-          {% if row.value is not none %}
-            <span class="row-value">${{ "%.2f"|format(row.value) }}</span>
-          {% else %}
-            <span class="row-value empty">—</span>
-          {% endif %}
-        </div>
-        {% endfor %}
-      </div>
+  <div class="wrap">
+    <nav>
+      <a class="back-link" href="/">← All months</a>
+      {% if months %}
+        <select class="month-picker" data-month-picker>
+          {% for m in months %}
+            <option value="{{ m }}"
+                    data-url="{{ url_for('month_detail', month_slug=m.replace('/', '-', 1)) }}"
+                    {% if m == sheet_name %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
       {% endif %}
-    {% endfor %}
+    </nav>
 
-  {% endif %}
+    <header>
+      <p class="eyebrow">Monthly Detail</p>
+      <h1>{{ sheet_name }}</h1>
+    </header>
 
-  <footer>
-    Data pulled live from Google Sheets &nbsp;·&nbsp; <a class="back-link" href="/">View all months</a>
-  </footer>
+    {% if warning %}
+      <div class="error-box" role="status">{{ warning }}</div>
+    {% endif %}
 
-</div>
+    {% if error %}
+      <div class="error-box">{{ error }}</div>
+
+    {% elif budget %}
+
+      {% set s = budget.get('summary', {}) %}
+      <div class="summary">
+        <div class="summary-cell">
+          <span class="summary-label">Net Income</span>
+          <span class="summary-value">
+            {% if s.net_income is not none %}${{ "%.2f"|format(s.net_income) }}{% else %}—{% endif %}
+          </span>
+        </div>
+        <div class="summary-cell">
+          <span class="summary-label">Total Expenses</span>
+          <span class="summary-value">
+            {% if s.total_expenses is not none %}${{ "%.2f"|format(s.total_expenses) }}{% else %}—{% endif %}
+          </span>
+        </div>
+        <div class="summary-cell">
+          <span class="summary-label">Remaining</span>
+          <span class="summary-value {% if s.diff is not none %}{% if s.diff >= 0 %}positive{% else %}negative{% endif %}{% endif %}">
+            {% if s.diff is not none %}${{ "%.2f"|format(s.diff) }}{% else %}—{% endif %}
+          </span>
+        </div>
+      </div>
+
+      {% for section_name, rows in budget.items() %}
+        {% if section_name != "summary" and rows is iterable and rows is not string %}
+          <div class="section">
+            <div class="section-header">
+              <span class="section-title">{{ section_name | capitalize }}</span>
+              <div class="section-rule"></div>
+            </div>
+            {% for row in rows %}
+              <div class="row">
+                <span class="row-label">
+                  {{ row.label | replace('_', ' ') }}
+                  <span class="row-meta">{{ row.cell }}</span>
+                </span>
+                {% if row.value is not none %}
+                  <span class="row-value">${{ "%.2f"|format(row.value) }}</span>
+                {% else %}
+                  <span class="row-value empty">—</span>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endfor %}
+
+    {% endif %}
+
+    <footer>
+      Data pulled live from Google Sheets &nbsp;·&nbsp; <a class="back-link"
+                                                           href="/">View all months</a>
+    </footer>
+
+  </div>
 {% endblock %}

@@ -2,49 +2,72 @@
 {% block title %}Balances · Net Worth{% endblock %}
 {% block page_head %}{% endblock %}
 {% block content %}
-<div class="wrap page-balances">
-  <header>
-    <p class="eyebrow">Personal Finance</p>
-    <h1>Balances &amp; Net Worth</h1>
-  </header>
+  <div class="wrap page-balances">
+    <header>
+      <p class="eyebrow">Personal Finance</p>
+      <h1>Balances &amp; Net Worth</h1>
+    </header>
 
-  <form class="source-filter" action="/balances" method="get" data-auto-submit>
-    <label for="source">Data source</label>
-    <select id="source" name="source">
-      <option value="all" {% if source_filter == 'all' %}selected{% endif %}>All sources</option>
-      <option value="manual" {% if source_filter == 'manual' %}selected{% endif %}>Manual</option>
-      <option value="simplefin" {% if source_filter == 'simplefin' %}selected{% endif %}>SimpleFIN</option>
-    </select>
-  </form>
+    <form class="source-filter"
+          action="/balances"
+          method="get"
+          data-auto-submit>
+      <label for="source">Data source</label>
+      <select id="source" name="source">
+        <option value="all" {% if source_filter == 'all' %}selected{% endif %}>All sources</option>
+        <option value="manual" {% if source_filter == 'manual' %}selected{% endif %}>Manual</option>
+        <option value="simplefin"
+                {% if source_filter == 'simplefin' %}selected{% endif %}>SimpleFIN</option>
+      </select>
+    </form>
 
-  {% if error %}
-    <div class="error-box">{{ error }}</div>
-  {% elif net_worth is none %}
-    <p class="empty">No balance snapshots match this data source.</p>
-  {% else %}
-    <div class="stats">
-      <div class="stat"><span class="stat-label">Net worth</span><span class="stat-value">${{ "{:,.2f}".format(net_worth) }}</span><span class="stat-sub">latest available balance per account</span></div>
-      <div class="stat"><span class="stat-label">Latest snapshot</span><span class="stat-value">{{ latest_date }}</span><span class="stat-sub">{{ accounts|length }} account{{ '' if accounts|length == 1 else 's' }} tracked</span></div>
-    </div>
+    {% if error %}
+      <div class="error-box">{{ error }}</div>
+    {% elif net_worth is none %}
+      <p class="empty">No balance snapshots match this data source.</p>
+    {% else %}
+      <div class="stats">
+        <div class="stat"><span class="stat-label">Net worth</span><span class="stat-value">${{ "{:,.2f}".format(net_worth) }}</span><span class="stat-sub">latest available balance per account</span></div>
+        <div class="stat"><span class="stat-label">Latest snapshot</span><span class="stat-value">{{ latest_date }}</span><span class="stat-sub">{{ accounts|length }} account{{ '' if accounts|length == 1 else 's' }} tracked</span></div>
+      </div>
 
-    <div class="section-head">Net worth trend<div class="section-rule"></div></div>
-    <div class="chart-wrap"><canvas id="net-worth-chart" data-trend-url="{{ url_for('balances_trend', source=source_filter) }}" role="img" aria-label="Net worth history chart"></canvas></div>
+      <div class="section-head">
+        Net worth trend
+        <div class="section-rule"></div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="net-worth-chart"
+                data-trend-url="{{ url_for('balances_trend', source=source_filter) }}"
+                role="img"
+                aria-label="Net worth history chart"></canvas>
+      </div>
 
-    <div class="section-head">Accounts<div class="section-rule"></div></div>
-    <table>
-      <thead><tr><th>Account</th><th>Status</th><th>Balance</th></tr></thead>
-      <tbody>
-        {% for account in accounts %}
-        <tr>
-          <td><span class="account">{{ account.name }}</span><span class="date">as of {{ account.date }}</span></td>
-          <td class="status {% if account.stale %}stale{% endif %}">{% if account.stale %}Stale{% else %}Current{% endif %}</td>
-          <td>${{ "{:,.2f}".format(account.amount) }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
-  {% endif %}
-  <footer>Balance snapshots from SQLite</footer>
-</div>
+      <div class="section-head">
+        Accounts
+        <div class="section-rule"></div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Account</th>
+            <th>Status</th>
+            <th>Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for account in accounts %}
+            <tr>
+              <td><span class="account">{{ account.name }}</span><span class="date">as of {{ account.date }}</span></td>
+              <td class="status {% if account.stale %}stale{% endif %}">{% if account.stale %}Stale{% else %}Current{% endif %}</td>
+              <td>${{ "{:,.2f}".format(account.amount) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% endif %}
+    <footer>
+      Balance snapshots from SQLite
+    </footer>
+  </div>
 {% endblock %}

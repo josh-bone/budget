@@ -1,62 +1,104 @@
 {% extends "base.html" %}
 {% block title %}Attention Needed · Budget{% endblock %}
-{% block page_head %}<style>
+{% block page_head %}
+  <style>
   .transfer-page{max-width:1180px;margin:0 auto;padding:24px 24px 64px;color:#202b36;font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
   .transfer-nav{display:flex;gap:18px;border-bottom:1px solid #dce3e9;padding:0 0 14px;margin-bottom:26px}.transfer-nav a{color:#245e86;text-decoration:none}
   .transfer-page h1{margin:0;font-size:30px}.transfer-page h2{margin:28px 0 10px;font-size:20px}.transfer-intro,.muted{color:#697786}.transfer-flash{padding:10px 13px;border-radius:8px;background:#e9f5ed;color:#28613a;margin:10px 0}.transfer-flash.error{background:#fff0ee;color:#8c3730}
   .transfer-card{background:#fff;border:1px solid #dce3e9;border-radius:10px;padding:16px;margin:12px 0}.pair{display:grid;grid-template-columns:1fr 1fr;gap:18px}.side{min-width:0}.side strong{display:block}.description{overflow-wrap:anywhere}.meta{color:#697786;font-size:13px}.actions{display:flex;align-items:end;flex-wrap:wrap;gap:8px;margin-top:14px}.actions form{display:flex;align-items:end;gap:8px;margin:0}.actions label{display:grid;gap:4px;color:#536271;font-size:12px}.actions select{min-width:180px;padding:7px;border:1px solid #cbd5de;border-radius:6px;background:white;font:inherit}.actions button{padding:8px 12px;border:1px solid #245e86;border-radius:6px;background:#245e86;color:white;font-weight:650;cursor:pointer}.actions button.reject{border-color:#bdcad4;background:white;color:#245e86}.actions button:hover{filter:brightness(.94)}.approved{width:100%;border-collapse:collapse}.approved th,.approved td{text-align:left;padding:9px;border-bottom:1px solid #e9edf0}.approved th{color:#697786;font-size:12px;text-transform:uppercase}.inline{display:inline}
   @media(max-width:650px){.transfer-page{padding:16px 12px 40px}.pair{grid-template-columns:1fr}.actions form{align-items:stretch;flex-direction:column;width:100%}.actions select,.actions button{width:100%}.approved{display:block;overflow-x:auto}}
-</style>{% endblock %}
+  </style>
+{% endblock %}
 {% block content %}
-<main class="transfer-page">
-  {% for category,message in get_flashed_messages(with_categories=true) %}<p class="transfer-flash {{ category }}" role="status">{{ message }}</p>{% endfor %}
-  <header><p class="meta">Review</p><h1>Attention Needed</h1><p class="transfer-intro">Review balance names that need an account match and possible transfer pairs.</p></header>
+  <main class="transfer-page">
+    {% for category,message in get_flashed_messages(with_categories=true) %}<p class="transfer-flash {{ category }}" role="status">{{ message }}</p>{% endfor %}
+    <header>
+      <p class="meta">Review</p>
+      <h1>Attention Needed</h1>
+      <p class="transfer-intro">Review balance names that need an account match and possible transfer pairs.</p>
+    </header>
 
-  <section id="accounts"><h2>Unmatched Google Sheets accounts · {{ unmatched_sheet_names|length }}</h2>
-    <p class="muted">These sheet labels do not match a canonical account name or alias. Match each label to an existing account; this will save the label as an alias. No account is created automatically.</p>
-    {% for item in unmatched_sheet_names %}<article class="transfer-card"><div class="pair"><div class="side"><strong>{{ item.name }}</strong><span class="meta">{{ item.count }} snapshot{{ '' if item.count == 1 else 's' }} · latest {{ item.latest_date }}</span></div><div class="side"><strong>Latest balance</strong><span class="meta">{% if item.amount is not none %}${{ '{:,.2f}'.format(item.amount) }}{% else %}—{% endif %}</span></div></div>
-      {% if canonical_accounts %}<form class="actions" method="post" action="{{ url_for('map_sheet_account') }}"><input type="hidden" name="sheet_name" value="{{ item.name }}"><label>Match to canonical account<select name="account_id" required><option value="" selected disabled>Choose an account</option>{% for id,name in canonical_accounts %}<option value="{{ id }}">{{ name }}</option>{% endfor %}</select></label><button type="submit">Save match</button></form>{% else %}<p class="meta">Add a canonical account on the <a href="{{ url_for('accounts') }}">Accounts page</a> before matching this name.</p>{% endif %}
-    </article>{% else %}<p class="muted">No unmatched Google Sheets account names.</p>{% endfor %}
+    <section id="accounts">
+      <h2>Unmatched Google Sheets accounts · {{ unmatched_sheet_names|length }}</h2>
+      <p class="muted">These sheet labels do not match a canonical account name or alias. Match each label to an existing account; this will save the label as an alias. No account is created automatically.</p>
+      {% for item in unmatched_sheet_names %}<article class="transfer-card"><div class="pair"><div class="side"><strong>{{ item.name }}</strong><span class="meta">{{ item.count }} snapshot{{ '' if item.count == 1 else 's' }} · latest {{ item.latest_date }}</span></div><div class="side"><strong>Latest balance</strong><span class="meta">{% if item.amount is not none %}${{ '{:,.2f}'.format(item.amount) }}{% else %}—{% endif %}</span></div></div>
+      {% if canonical_accounts %}<form class="actions"
+                                       method="post"
+                                       action="{{ url_for('map_sheet_account') }}"><input type="hidden" name="sheet_name" value="{{ item.name }}"><label>Match to canonical account<select name="account_id" required><option value="" selected disabled>Choose an account</option>{% for id,name in canonical_accounts %}<option value="{{ id }}">{{ name }}</option>{% endfor %}</select></label><button type="submit">Save match</button></form>{% else %}<p class="meta">Add a canonical account on the <a href="{{ url_for('accounts') }}">Accounts page</a> before matching this name.</p>{% endif %}
+      </article>{% else %}<p class="muted">No unmatched Google Sheets account names.</p>{% endfor %}
   </section>
 
-  <section id="transfers"><h2>Suggested transfers · {{ suggestions|length }}</h2>
-  <p class="muted">Possible pairs match opposite amounts across accounts within 10 days. Suggestions never change categories by themselves.</p>
-  {% if not transfer_categories %}<p class="transfer-flash error">Flag a category as a transfer category on <a href="{{ url_for('rules') }}">Categories &amp; Rules</a> before approving suggestions.</p>{% endif %}
-  {% for pair in suggestions %}
-  <article class="transfer-card">
-    <div class="pair">
-      <div class="side"><span class="meta">Outgoing · {{ pair.source.account }}</span><strong class="description">{{ pair.source.description }}</strong><span class="meta">{{ pair.source.date }} · -${{ '{:,.2f}'.format(-pair.source.amount) }}</span></div>
-      <div class="side"><span class="meta">Incoming · {{ pair.candidate.account }}</span><strong class="description">{{ pair.candidate.description }}</strong><span class="meta">{{ pair.candidate.date }} · +${{ '{:,.2f}'.format(pair.candidate.amount) }} · {{ pair.days_apart }} day{{ '' if pair.days_apart == 1 else 's' }} apart</span></div>
-    </div>
-    <div class="actions">
-      {% if transfer_categories %}<form method="post" action="{{ url_for('approve_transfer') }}">
-        <input type="hidden" name="source_account_id" value="{{ pair.source.account_id }}"><input type="hidden" name="source_transaction_id" value="{{ pair.source.transaction_id }}">
-        <input type="hidden" name="candidate_account_id" value="{{ pair.candidate.account_id }}"><input type="hidden" name="candidate_transaction_id" value="{{ pair.candidate.transaction_id }}">
-        <label>Transfer category<select name="category_id" required><option value="" selected disabled>Choose a category</option>{% for category in transfer_categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</select></label><button type="submit">Approve pair</button>
-      </form>{% endif %}
-      <form method="post" action="{{ url_for('reject_transfer') }}">
-        <input type="hidden" name="source_account_id" value="{{ pair.source.account_id }}"><input type="hidden" name="source_transaction_id" value="{{ pair.source.transaction_id }}">
-        <input type="hidden" name="candidate_account_id" value="{{ pair.candidate.account_id }}"><input type="hidden" name="candidate_transaction_id" value="{{ pair.candidate.transaction_id }}">
-        <button class="reject" type="submit">Reject pair</button>
-      </form>
-    </div>
-  </article>
-  {% else %}<p class="muted">No transfer pairs need review.</p>{% endfor %}
+  <section id="transfers">
+    <h2>Suggested transfers · {{ suggestions|length }}</h2>
+    <p class="muted">Possible pairs match opposite amounts across accounts within 10 days. Suggestions never change categories by themselves.</p>
+    {% if not transfer_categories %}<p class="transfer-flash error">Flag a category as a transfer category on <a href="{{ url_for('rules') }}">Categories &amp; Rules</a> before approving suggestions.</p>{% endif %}
+    {% for pair in suggestions %}
+      <article class="transfer-card">
+        <div class="pair">
+          <div class="side"><span class="meta">Outgoing · {{ pair.source.account }}</span><strong class="description">{{ pair.source.description }}</strong><span class="meta">{{ pair.source.date }} · -${{ '{:,.2f}'.format(-pair.source.amount) }}</span></div>
+          <div class="side"><span class="meta">Incoming · {{ pair.candidate.account }}</span><strong class="description">{{ pair.candidate.description }}</strong><span class="meta">{{ pair.candidate.date }} · +${{ '{:,.2f}'.format(pair.candidate.amount) }} · {{ pair.days_apart }} day{{ '' if pair.days_apart == 1 else 's' }} apart</span></div>
+        </div>
+        <div class="actions">
+          {% if transfer_categories %}
+            <form method="post" action="{{ url_for('approve_transfer') }}">
+              <input type="hidden"
+                     name="source_account_id"
+                     value="{{ pair.source.account_id }}"><input type="hidden"
+                                                                 name="source_transaction_id"
+                                                                 value="{{ pair.source.transaction_id }}">
+              <input type="hidden"
+                     name="candidate_account_id"
+                     value="{{ pair.candidate.account_id }}"><input type="hidden"
+                                                                    name="candidate_transaction_id"
+                                                                    value="{{ pair.candidate.transaction_id }}">
+              <label>Transfer category<select name="category_id" required><option value="" selected disabled>Choose a category</option>{% for category in transfer_categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</select></label><button type="submit">Approve pair</button>
+            </form>
+          {% endif %}
+          <form method="post" action="{{ url_for('reject_transfer') }}">
+            <input type="hidden"
+                   name="source_account_id"
+                   value="{{ pair.source.account_id }}"><input type="hidden"
+                                                               name="source_transaction_id"
+                                                               value="{{ pair.source.transaction_id }}">
+            <input type="hidden"
+                   name="candidate_account_id"
+                   value="{{ pair.candidate.account_id }}"><input type="hidden"
+                                                                  name="candidate_transaction_id"
+                                                                  value="{{ pair.candidate.transaction_id }}">
+            <button class="reject" type="submit">Reject pair</button>
+          </form>
+        </div>
+      </article>
+    {% else %}<p class="muted">No transfer pairs need review.</p>{% endfor %}
   </section>
 
-  <section id="refunds"><h2>Suggested refunds · {{ refund_suggestions|length }}</h2>
+  <section id="refunds">
+    <h2>Suggested refunds · {{ refund_suggestions|length }}</h2>
     <p class="muted">Same account, exact amount, purchase before credit within {{ refund_window }} days. Review each match; approval offsets spending in the refund month.</p>
-    {% for pair in refund_suggestions %}<article class="transfer-card"><div class="pair">
-      <div class="side"><span class="meta">Purchase · {{ pair.purchase.account }}</span><strong class="description">{{ pair.purchase.description }}</strong><span class="meta">{{ pair.purchase.date }} · {{ '${:,.2f}'.format(pair.purchase.amount) }}</span></div>
-      <div class="side"><span class="meta">Refund · {{ pair.refund.account }}</span><strong class="description">{{ pair.refund.description }}</strong><span class="meta">{{ pair.refund.date }} · +{{ '${:,.2f}'.format(pair.refund.amount) }} · {{ pair.days_apart }} days later</span></div>
-    </div><form class="actions" method="post" action="{{ url_for('approve_refund') }}">
-      <input type="hidden" name="purchase_account_id" value="{{ pair.purchase.account_id }}"><input type="hidden" name="purchase_transaction_id" value="{{ pair.purchase.transaction_id }}"><input type="hidden" name="refund_account_id" value="{{ pair.refund.account_id }}"><input type="hidden" name="refund_transaction_id" value="{{ pair.refund.transaction_id }}"><button type="submit">Approve refund</button>
-    </form></article>{% else %}<p class="muted">No refund matches need review.</p>{% endfor %}
-  </section>
-  <h2>Approved refunds · {{ approved_refunds|length }}</h2>
-  {% if approved_refunds %}<table class="approved"><thead><tr><th>Refund</th><th>Account</th><th>Date</th><th>Purchase</th><th>Amount</th><th></th></tr></thead><tbody>
-  {% for row in approved_refunds %}<tr><td>{{ row[4] }}</td><td>{{ row[2] }}</td><td>{{ row[3] }}</td><td>{{ row[8] }} · {{ row[6] }} · {{ row[7] }}</td><td>+{{ '${:,.2f}'.format(row[5]) }}</td><td><form method="post" action="{{ url_for('undo_refund') }}"><input type="hidden" name="refund_account_id" value="{{ row[0] }}"><input type="hidden" name="refund_transaction_id" value="{{ row[1] }}"><button class="reject">Undo</button></form></td></tr>{% endfor %}
-  </tbody></table>{% else %}<p class="muted">No approved refunds.</p>{% endif %}
+    {% for pair in refund_suggestions %}
+      <article class="transfer-card">
+        <div class="pair">
+          <div class="side"><span class="meta">Purchase · {{ pair.purchase.account }}</span><strong class="description">{{ pair.purchase.description }}</strong><span class="meta">{{ pair.purchase.date }} · {{ '${:,.2f}'.format(pair.purchase.amount) }}</span></div>
+          <div class="side"><span class="meta">Refund · {{ pair.refund.account }}</span><strong class="description">{{ pair.refund.description }}</strong><span class="meta">{{ pair.refund.date }} · +{{ '${:,.2f}'.format(pair.refund.amount) }} · {{ pair.days_apart }} days later</span></div>
+        </div>
+        <form class="actions"
+              method="post"
+              action="{{ url_for('approve_refund') }}">
+          <input type="hidden"
+                 name="purchase_account_id"
+                 value="{{ pair.purchase.account_id }}"><input type="hidden"
+                                                               name="purchase_transaction_id"
+                                                               value="{{ pair.purchase.transaction_id }}"><input type="hidden"
+                                                                                                                 name="refund_account_id"
+                                                                                                                 value="{{ pair.refund.account_id }}"><input type="hidden"
+                                                                                                                                                             name="refund_transaction_id"
+                                                                                                                                                             value="{{ pair.refund.transaction_id }}"><button type="submit">Approve refund</button>
+        </form></article>{% else %}<p class="muted">No refund matches need review.</p>{% endfor %}
+    </section>
+    <h2>Approved refunds · {{ approved_refunds|length }}</h2>
+    {% if approved_refunds %}<table class="approved"><thead><tr><th>Refund</th><th>Account</th><th>Date</th><th>Purchase</th><th>Amount</th><th></th></tr></thead><tbody>
+      {% for row in approved_refunds %}<tr><td>{{ row[4] }}</td><td>{{ row[2] }}</td><td>{{ row[3] }}</td><td>{{ row[8] }} · {{ row[6] }} · {{ row[7] }}</td><td>+{{ '${:,.2f}'.format(row[5]) }}</td><td><form method="post" action="{{ url_for('undo_refund') }}"><input type="hidden" name="refund_account_id" value="{{ row[0] }}"><input type="hidden" name="refund_transaction_id" value="{{ row[1] }}"><button class="reject">Undo</button></form></td></tr>{% endfor %}
+    </tbody></table>{% else %}<p class="muted">No approved refunds.</p>{% endif %}
 
   <h2>Approved transfers · {{ approved|length }}</h2>
   {% if approved %}<table class="approved"><thead><tr><th>Date</th><th>Account</th><th>Description</th><th>Amount</th><th>Category</th><th></th></tr></thead><tbody>

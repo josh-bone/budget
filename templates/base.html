@@ -1,19 +1,23 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="app-version" content="{{ app_version }}">
-  <title>{% block title %}Budget{% endblock %}</title>
-  {% block page_head %}{% endblock %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
-  <script defer src="{{ url_for('static', filename='js/ui.js') }}"></script>
-  <script defer src="{{ url_for('static', filename='js/reporting.js') }}"></script>
-</head>
-<body>
-  {% if budget_staging %}<aside class="staging-banner" role="status">STAGING INSTANCE</aside>{% endif %}
-  <div class="main-nav-frame">{% include "_main_nav.html" %}</div>
-  {% block content %}{% endblock %}
-  <footer class="site-footer"><a href="{{ url_for('report_problem') }}">Report a Problem</a></footer>
-</body>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="app-version" content="{{ app_version }}">
+    <title>{% block title %}Budget{% endblock %}</title>
+    {% block page_head %}{% endblock %}
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/app.css') }}">
+    <script defer src="{{ url_for('static', filename='js/ui.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/reporting.js') }}"></script>
+  </head>
+  <body>
+    {% if budget_staging %}<aside class="staging-banner"
+                                  role="status">STAGING INSTANCE</aside>{% endif %}
+    <div class="main-nav-frame">{% include "_main_nav.html" %}</div>
+    {% block content %}{% endblock %}
+    <footer class="site-footer">
+      <a href="{{ url_for('report_problem') }}">Report a Problem</a>
+    </footer>
+  </body>
 </html>

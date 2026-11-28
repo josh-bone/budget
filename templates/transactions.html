@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Transactions{% endblock %}
-{% block page_head %}<style>
+{% block page_head %}
+  <style>
 body{font:16px system-ui;color:#222}a{color:#245}h1{margin:1.5rem 0}form.filters{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin:1rem 0;padding:1rem;background:#f4f5f7}input,select,button{font:inherit;padding:.4rem}
 .cat-dropdown{position:relative;display:inline-block;vertical-align:middle}
 .cat-dropdown summary{padding:.4rem .6rem;border:1px solid #767676;border-radius:2px;background:#fff;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:.5rem;min-width:11rem;justify-content:space-between;user-select:none}
@@ -13,68 +14,140 @@ body{font:16px system-ui;color:#222}a{color:#245}h1{margin:1.5rem 0}form.filters
 .cat-menu input{margin:0;padding:0}
 .cat-select-all{border-bottom:1px solid #ddd;font-weight:600;margin-bottom:.2rem}
 table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:.6rem;border-bottom:1px solid #ddd;vertical-align:top}th{white-space:nowrap}.amount{text-align:right;white-space:nowrap}.pending,.manual{font-size:.75rem;border-radius:1rem;background:#fff1c2;padding:.15rem .5rem;color:#654b00;white-space:nowrap}.manual{background:#e8eef8;color:#345}.description{min-width:18rem}.actions{white-space:nowrap}.pagination{display:flex;justify-content:space-between;margin:1rem 0}.muted{color:#666;font-size:.9rem}.spend{display:grid;grid-template-columns:220px 1fr;gap:1.5rem;align-items:center;padding:1rem;background:#f8f9fa;border-radius:.5rem}.pie{display:block;width:200px;height:200px;margin:auto;cursor:pointer}.pie-tooltip{position:fixed;z-index:10;pointer-events:none;padding:.35rem .55rem;background:#222;color:#fff;border-radius:.25rem;font-size:.85rem;box-shadow:0 2px 6px #0003}.pie-tooltip[hidden]{display:none}.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.5rem 1rem;list-style:none;padding:0}.legend li{display:flex;gap:.5rem;align-items:center}.swatch{width:.8rem;height:.8rem;border-radius:2px;flex:none}@media(max-width:600px){.spend{grid-template-columns:1fr}.pie{width:170px;height:170px}}
-</style>{% endblock %}
+  </style>
+{% endblock %}
 {% block content %}
-<main class="wrap"><header><p class="eyebrow">Activity</p><h1>Transactions</h1></header>
-<form class="filters" method="get" action="{{ url_for('transactions') }}">
-<input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="order" value="{{ order }}">
-<label>Account <select name="account_id"><option value="">All accounts</option>{% for id,name in accounts %}<option value="{{ id }}" {% if filters.account_id == id %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
-<label>Owner <select name="owner"><option value="">All owners</option>{% for value in owners %}<option value="{{ value }}" {% if filters.owner == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
-<span>Category
-  <details class="cat-dropdown" id="catDropdown">
-    <summary id="catSummary">Select categories...</summary>
-    <div class="cat-menu">
-      <label class="cat-select-all">
-        <input type="checkbox" id="catSelectAll"> Select All
+  <main class="wrap">
+    <header>
+      <p class="eyebrow">Activity</p>
+      <h1>Transactions</h1>
+    </header>
+    <form class="filters" method="get" action="{{ url_for('transactions') }}">
+      <input type="hidden"
+             name="sort"
+             value="{{ sort }}"><input type="hidden"
+                                       name="order"
+                                       value="{{ order }}">
+      <label>Account <select name="account_id"><option value="">All accounts</option>{% for id,name in accounts %}<option value="{{ id }}" {% if filters.account_id == id %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
+      <label>Owner <select name="owner"><option value="">All owners</option>{% for value in owners %}<option value="{{ value }}"
+                                                                                                             {% if filters.owner == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+      <span>Category
+        <details class="cat-dropdown" id="catDropdown">
+          <summary id="catSummary">Select categories...</summary>
+          <div class="cat-menu">
+            <label class="cat-select-all">
+              <input type="checkbox" id="catSelectAll">
+              Select All
+            </label>
+            <label>
+              {% if "uncategorized" in filters.category_id %}
+                <input type="checkbox"
+                       class="cat-cb"
+                       name="category_id"
+                       value="uncategorized"
+                       checked>
+              {% else %}
+                <input type="checkbox"
+                       class="cat-cb"
+                       name="category_id"
+                       value="uncategorized">
+              {% endif %}
+              Uncategorized
+            </label>
+            {% for id, name in chart_categories %}
+              {% set id_str = id ~ '' %}
+              <label>
+                {% if id_str in filters.category_id %}
+                  <input type="checkbox"
+                         class="cat-cb"
+                         name="category_id"
+                         value="{{ id }}"
+                         checked>
+                {% else %}
+                  <input type="checkbox" class="cat-cb" name="category_id" value="{{ id }}">
+                {% endif %}
+                {{ name }}
+              </label>
+            {% endfor %}
+          </div>
+        </details>
+      </span>
+      <label>Status <select name="pending"><option value="">All</option><option value="1" {% if filters.pending == '1' %}selected{% endif %}>Pending</option><option value="0" {% if filters.pending == '0' %}selected{% endif %}>Posted</option></select></label>
+      <label>
+        Description
+        <input name="q" value="{{ filters.q }}" placeholder="Search">
       </label>
       <label>
-        {% if 'uncategorized' in filters.category_id %}
-          <input type="checkbox" class="cat-cb" name="category_id" value="uncategorized" checked>
-        {% else %}
-          <input type="checkbox" class="cat-cb" name="category_id" value="uncategorized">
-        {% endif %}
-        Uncategorized
+        Amount at least
+        <input name="min_amount"
+               type="number"
+               step="0.01"
+               value="{{ filters.min_amount }}"
+               placeholder="-100.00">
       </label>
-      {% for id, name in chart_categories %}
-        {% set id_str = id ~ '' %}
-        <label>
-          {% if id_str in filters.category_id %}
-            <input type="checkbox" class="cat-cb" name="category_id" value="{{ id }}" checked>
-          {% else %}
-            <input type="checkbox" class="cat-cb" name="category_id" value="{{ id }}">
-          {% endif %}
-          {{ name }}
+      <label>
+        Amount at most
+        <input name="max_amount"
+               type="number"
+               step="0.01"
+               value="{{ filters.max_amount }}"
+               placeholder="100.00">
+      </label>
+      <label>Month <select name="month"><option value="">All available dates</option>{% for month in months %}<option value="{{ month }}"
+                                                                                                                      {% if selected_month == month %}selected{% endif %}>{{ month }}</option>{% endfor %}</select></label>
+      <label>
+        From
+        <input type="date" name="start_date" value="{{ start_date }}"></label><label>Through
+          <input type="date" name="end_date" value="{{ end_date }}">
         </label>
-      {% endfor %}
-    </div>
-  </details>
-</span>
-<label>Status <select name="pending"><option value="">All</option><option value="1" {% if filters.pending == '1' %}selected{% endif %}>Pending</option><option value="0" {% if filters.pending == '0' %}selected{% endif %}>Posted</option></select></label>
-<label>Description <input name="q" value="{{ filters.q }}" placeholder="Search"></label>
-<label>Amount at least <input name="min_amount" type="number" step="0.01" value="{{ filters.min_amount }}" placeholder="-100.00"></label>
-<label>Amount at most <input name="max_amount" type="number" step="0.01" value="{{ filters.max_amount }}" placeholder="100.00"></label>
-<label>Month <select name="month"><option value="">All available dates</option>{% for month in months %}<option value="{{ month }}" {% if selected_month == month %}selected{% endif %}>{{ month }}</option>{% endfor %}</select></label>
-<label>From <input type="date" name="start_date" value="{{ start_date }}"></label><label>Through <input type="date" name="end_date" value="{{ end_date }}"></label>
-<label><input type="checkbox" name="leaf" value="1" {% if not rollup %}checked{% endif %}> Show leaf categories</label>
-<label><input type="checkbox" name="show_transfers" value="1" {% if show_transfers %}checked{% endif %}> Show transfers</label>
-<button>Apply filters</button>
-</form>
-<h2>Spend by category</h2>
-<section class="spend" aria-label="Spending by category chart" data-spend-url="{{ url_for('transaction_spend') }}">
-<canvas class="pie" role="img" aria-label="Pie chart of {{ '%.2f'|format(spend_total) }} dollars spent by category"></canvas>
-<div><strong class="spend-total">Total spend: ${{ '{:,.2f}'.format(spend_total) }}</strong>
-{% if spend_breakdown %}<ul class="legend">{% for item in spend_breakdown %}<li><span class="swatch" style="background:{{ item.color }}"></span><span>{{ item.name }}: ${{ '{:,.2f}'.format(item.amount) }} ({{ '%.1f'|format(item.percent) }}%)</span></li>{% endfor %}</ul>{% else %}<p class="muted">No spending found for this period.</p>{% endif %}</div>
-</section>
-<p class="muted">{{ total }} transaction{{ '' if total == 1 else 's' }}</p>
-{% set next_amount_order = 'asc' if sort == 'amount' and order == 'desc' else 'desc' %}
-<table><thead><tr><th><a href="{{ url_for('transactions', **dict(filters, sort='date', order='desc' if sort != 'date' or order == 'asc' else 'asc')) }}">Date{% if sort == 'date' %} {{ '↑' if order == 'asc' else '↓' }}{% endif %}</a></th><th>Account</th><th>Description</th><th class="amount"><a href="{{ url_for('transactions', **dict(filters, sort='amount', order=next_amount_order)) }}">Amount{% if sort == 'amount' %} {{ '↑' if order == 'asc' else '↓' }}{% endif %}</a></th><th>Category</th><th>Actions</th></tr></thead><tbody>
-{% for row in transactions %}<tr><td>{{ row.date or '' }}</td><td>{{ row.account }}</td><td class="description">{{ row.description }} {% if row.pending %}<span class="pending">Pending</span>{% endif %}{% if row.refund_association %}<span class="muted"> · {{ row.refund_association }}</span>{% endif %}</td>
-<td class="amount">{{ '-${:,.2f}'.format(-row.amount) if row.amount < 0 else '+${:,.2f}'.format(row.amount) }}</td>
-<td><form class="category-form" method="post" action="{{ url_for('update_transaction_category', account_id=row.account_id, transaction_id=row.transaction_id) }}"><input type="hidden" name="return_to" value="{{ request.full_path if request.query_string else request.path }}"><select name="category_id" aria-label="Category for {{ row.description }}"><option value="">Uncategorized</option>{% for id,name in categories %}<option value="{{ id }}" {% if row.category_id == id %}selected{% endif %}>{{ name }}</option>{% endfor %}</select><button type="submit">Save</button>{% if row.manual %} <span class="manual" title="Manually categorized">Manual</span>{% endif %}</form></td>
-<td class="actions"><a href="{{ url_for('rules', description=row.description, category_id=row.category_id or '') }}">+ Rule</a>{% if row.refund_association %}<form method="post" action="{{ url_for('undo_refund') }}" style="display:inline"><input type="hidden" name="refund_account_id" value="{{ row.refund_account_id }}"><input type="hidden" name="refund_transaction_id" value="{{ row.refund_transaction_id }}"><button>Undo refund</button></form>{% endif %}<form class="reset-form" method="post" action="{{ url_for('update_transaction_category', account_id=row.account_id, transaction_id=row.transaction_id) }}" style="display:inline;{% if not row.manual %}display:none{% endif %}"><input type="hidden" name="category_id" value=""><input type="hidden" name="return_to" value="{{ request.full_path if request.query_string else request.path }}"><button>Reset to Auto</button></form></td></tr>
-{% else %}<tr><td colspan="6">No transactions match these filters.</td></tr>{% endfor %}
-</tbody></table>
-<nav class="pagination">{% if page > 1 %}<a href="{{ url_for('transactions', page=page-1, **filters) }}">← Previous</a>{% else %}<span></span>{% endif %}<span>Page {{ page }} of {{ pages }}</span>{% if page < pages %}<a href="{{ url_for('transactions', page=page+1, **filters) }}">Next →</a>{% endif %}</nav>
-<script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
+        <label><input type="checkbox"
+                      name="leaf"
+                      value="1"
+                      {% if not rollup %}checked{% endif %}> Show leaf categories</label>
+        <label><input type="checkbox"
+                      name="show_transfers"
+                      value="1"
+                      {% if show_transfers %}checked{% endif %}> Show transfers</label>
+        <button>Apply filters</button>
+      </form>
+      <h2>Spend by category</h2>
+      <section class="spend"
+               aria-label="Spending by category chart"
+               data-spend-url="{{ url_for('transaction_spend') }}">
+        <canvas class="pie"
+                role="img"
+                aria-label="Pie chart of {{ '%.2f'|format(spend_total) }} dollars spent by category"></canvas>
+        <div>
+          <strong class="spend-total">Total spend: ${{ '{:,.2f}'.format(spend_total) }}</strong>
+        {% if spend_breakdown %}<ul class="legend">{% for item in spend_breakdown %}<li><span class="swatch" style="background:{{ item.color }}"></span><span>{{ item.name }}: ${{ '{:,.2f}'.format(item.amount) }} ({{ '%.1f'|format(item.percent) }}%)</span></li>{% endfor %}</ul>{% else %}<p class="muted">No spending found for this period.</p>{% endif %}</div>
+      </section>
+      <p class="muted">{{ total }} transaction{{ '' if total == 1 else 's' }}</p>
+      {% set next_amount_order = 'asc' if sort == 'amount' and order == 'desc' else 'desc' %}
+      <table><thead><tr><th><a href="{{ url_for('transactions', **dict(filters, sort='date', order='desc' if sort != 'date' or order == 'asc' else 'asc')) }}">Date{% if sort == "date" %} {{ '↑' if order == 'asc' else '↓' }}{% endif %}</a></th><th>Account</th><th>Description</th><th class="amount"><a href="{{ url_for('transactions', **dict(filters, sort='amount', order=next_amount_order)) }}">Amount{% if sort == "amount" %} {{ '↑' if order == 'asc' else '↓' }}{% endif %}</a></th><th>Category</th><th>Actions</th></tr></thead><tbody>
+        {% for row in transactions %}<tr><td>{{ row.date or '' }}</td><td>{{ row.account }}</td><td class="description">{{ row.description }} {% if row.pending %}<span class="pending">Pending</span>{% endif %}{% if row.refund_association %}<span class="muted"> · {{ row.refund_association }}</span>{% endif %}</td>
+        <td class="amount">{{ '-${:,.2f}'.format(-row.amount) if row.amount < 0 else '+${:,.2f}'.format(row.amount) }}</td>
+        <td><form class="category-form"
+                  method="post"
+                  action="{{ url_for('update_transaction_category', account_id=row.account_id, transaction_id=row.transaction_id) }}"><input type="hidden"
+                                                                                                                                             name="return_to"
+                                                                                                                                             value="{{ request.full_path if request.query_string else request.path }}"><select name="category_id" aria-label="Category for {{ row.description }}"><option value="">Uncategorized</option>{% for id,name in categories %}<option value="{{ id }}" {% if row.category_id == id %}selected{% endif %}>{{ name }}</option>{% endfor %}</select><button type="submit">Save</button>{% if row.manual %} <span class="manual" title="Manually categorized">Manual</span>{% endif %}</form></td>
+        <td class="actions"><a href="{{ url_for('rules', description=row.description, category_id=row.category_id or '') }}">+ Rule</a>{% if row.refund_association %}<form method="post"
+                                                                                                                                                                            action="{{ url_for('undo_refund') }}"
+                                                                                                                                                                            style="display:inline"><input type="hidden"
+                                                                                                                                                                                                          name="refund_account_id"
+                                                                                                                                                                                                          value="{{ row.refund_account_id }}"><input type="hidden"
+                                                                                                                                                                                                                                                     name="refund_transaction_id"
+                                                                                                                                                                                                                                                     value="{{ row.refund_transaction_id }}"><button>Undo refund</button></form>{% endif %}<form class="reset-form"
+                                                                                                                                                                                                                                                                                                                                                 method="post"
+                                                                                                                                                                                                                                                                                                                                                 action="{{ url_for('update_transaction_category', account_id=row.account_id, transaction_id=row.transaction_id) }}"
+                                                                                                                                                                                                                                                                                                                                                 style="display:inline;
+                                                                                                                                                                                                                                                                                                                                                        {% if not row.manual %}display:none{% endif %}"><input type="hidden" name="category_id" value=""><input type="hidden"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                name="return_to"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                value="{{ request.full_path if request.query_string else request.path }}"><button>Reset to Auto</button></form></td></tr>
+    {% else %}<tr><td colspan="6">No transactions match these filters.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  <nav class="pagination">{% if page > 1 %}<a href="{{ url_for('transactions', page=page-1, **filters) }}">← Previous</a>{% else %}<span></span>{% endif %}<span>Page {{ page }} of {{ pages }}</span>{% if page < pages %}<a href="{{ url_for('transactions', page=page+1, **filters) }}">Next →</a>{% endif %}</nav>
+  <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
 </main>
 {% endblock %}

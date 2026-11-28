@@ -2,94 +2,94 @@
 {% block title %}Budget Overview{% endblock %}
 {% block page_head %}{% endblock %}
 {% block content %}
-<div class="wrap page-overview">
-  <header>
-    <p class="eyebrow">Personal Finance</p>
-    <h1>Budget Overview</h1>
-  </header>
+  <div class="wrap page-overview">
+    <header>
+      <p class="eyebrow">Personal Finance</p>
+      <h1>Budget Overview</h1>
+    </header>
 
-  {% if error %}
-    <div class="error-box">{{ error }}</div>
+    {% if error %}
+      <div class="error-box">{{ error }}</div>
 
-  {% elif trends %}
+    {% elif trends %}
 
-    {# ── Stat strip ── #}
-    <div class="stats">
-      <div class="stat">
-        <span class="stat-label">Months tracked</span>
-        <span class="stat-value">{{ trends.months | length }}</span>
+      {# ── Stat strip ── #}
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-label">Months tracked</span>
+          <span class="stat-value">{{ trends.months | length }}</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Avg net income</span>
+          <span class="stat-value">${{ "%.0f"|format(trends.avg_income) }}</span>
+          <span class="stat-sub">per month</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Avg expenses</span>
+          <span class="stat-value">${{ "%.0f"|format(trends.avg_expenses) }}</span>
+          <span class="stat-sub">per month</span>
+        </div>
+        <div class="stat">
+          {% set net = trends.total_income - trends.total_expenses %}
+          <span class="stat-label">Net saved</span>
+          <span class="stat-value {% if net >= 0 %}positive{% else %}negative{% endif %}">
+            ${{ "%.0f"|format(net) }}
+          </span>
+          <span class="stat-sub">all months</span>
+        </div>
       </div>
-      <div class="stat">
-        <span class="stat-label">Avg net income</span>
-        <span class="stat-value">${{ "%.0f"|format(trends.avg_income) }}</span>
-        <span class="stat-sub">per month</span>
+
+      {# ── Month-by-month table ── #}
+      <div class="section-head">
+        Monthly breakdown
+        <div class="section-rule"></div>
       </div>
-      <div class="stat">
-        <span class="stat-label">Avg expenses</span>
-        <span class="stat-value">${{ "%.0f"|format(trends.avg_expenses) }}</span>
-        <span class="stat-sub">per month</span>
-      </div>
-      <div class="stat">
-        {% set net = trends.total_income - trends.total_expenses %}
-        <span class="stat-label">Net saved</span>
-        <span class="stat-value {% if net >= 0 %}positive{% else %}negative{% endif %}">
-          ${{ "%.0f"|format(net) }}
-        </span>
-        <span class="stat-sub">all months</span>
-      </div>
-    </div>
 
-    {# ── Month-by-month table ── #}
-    <div class="section-head">
-      Monthly breakdown
-      <div class="section-rule"></div>
-    </div>
+      {% set max_exp = trends.expenses | select('number') | list | max if trends.expenses | select('number') | list else 1 %}
 
-    {% set max_exp = trends.expenses | select('number') | list | max if trends.expenses | select('number') | list else 1 %}
+      <table>
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>Net income</th>
+            <th>Expenses</th>
+            <th>Remaining</th>
+            <th class="bar-cell"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in range(trends.months | length) %}
+            {% set m = trends.months[i] %}
+            {% set inc = trends.income[i] %}
+            {% set exp = trends.expenses[i] %}
+            {% set d = trends.diff[i] %}
+            <tr>
+              <td><a href="/transactions?month={{ m | urlencode }}">{{ m }}</a></td>
+              <td>{% if inc is not none %}${{ "%.2f"|format(inc) }}{% else %}<span class="empty">—</span>{% endif %}</td>
+              <td>{% if exp is not none %}${{ "%.2f"|format(exp) }}{% else %}<span class="empty">—</span>{% endif %}</td>
+              <td class="{% if d is not none %}{% if d >= 0 %}positive{% else %}negative{% endif %}{% endif %}">
+                {% if d is not none %}${{ "%.2f"|format(d) }}{% else %}<span class="empty">—</span>{% endif %}
+              </td>
+              <td class="bar-cell">
+                {% if exp is not none and max_exp %}
+                  <div class="bar-wrap">
+                    <div class="bar-bg">
+                      <div class="bar-fill {% if d is not none and d < 0 %}over{% endif %}"
+                           style="width: {{ [(exp / max_exp * 100), 100] | min }}%"></div>
+                    </div>
+                  </div>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
 
-    <table>
-      <thead>
-        <tr>
-          <th>Month</th>
-          <th>Net income</th>
-          <th>Expenses</th>
-          <th>Remaining</th>
-          <th class="bar-cell"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for i in range(trends.months | length) %}
-        {% set m = trends.months[i] %}
-        {% set inc = trends.income[i] %}
-        {% set exp = trends.expenses[i] %}
-        {% set d   = trends.diff[i] %}
-        <tr>
-          <td><a href="/transactions?month={{ m | urlencode }}">{{ m }}</a></td>
-          <td>{% if inc is not none %}${{ "%.2f"|format(inc) }}{% else %}<span class="empty">—</span>{% endif %}</td>
-          <td>{% if exp is not none %}${{ "%.2f"|format(exp) }}{% else %}<span class="empty">—</span>{% endif %}</td>
-          <td class="{% if d is not none %}{% if d >= 0 %}positive{% else %}negative{% endif %}{% endif %}">
-            {% if d is not none %}${{ "%.2f"|format(d) }}{% else %}<span class="empty">—</span>{% endif %}
-          </td>
-          <td class="bar-cell">
-            {% if exp is not none and max_exp %}
-            <div class="bar-wrap">
-              <div class="bar-bg">
-                <div class="bar-fill {% if d is not none and d < 0 %}over{% endif %}"
-                     style="width: {{ [(exp / max_exp * 100), 100] | min }}%"></div>
-              </div>
-            </div>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    {% endif %}
 
-  {% endif %}
+    <footer>
+      Monthly totals from SQLite transactions. Pending transactions are excluded.
+    </footer>
 
-  <footer>
-    Monthly totals from SQLite transactions. Pending transactions are excluded.
-  </footer>
-
-</div>
+  </div>
 {% endblock %}
