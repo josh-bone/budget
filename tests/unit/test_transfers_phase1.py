@@ -1,4 +1,4 @@
-import re
+from html.parser import HTMLParser
 import sys
 from pathlib import Path
 
@@ -6,6 +6,30 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from app import app, load_sqlite_monthly_trends
 from budget.balances_db import _connect
+
+
+class _CategoryFilterParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.category_ids = set()
+
+    def handle_starttag(self, tag, attrs):
+        if tag != "input":
+            return
+        attributes = dict(attrs)
+        classes = attributes.get("class", "").split()
+        if (
+            attributes.get("type") == "checkbox"
+            and "cat-cb" in classes
+            and attributes.get("name") == "category_id"
+        ):
+            self.category_ids.add(attributes.get("value"))
+
+
+def _category_filter_ids(html):
+    parser = _CategoryFilterParser()
+    parser.feed(html)
+    return parser.category_ids
 
 
 def _seed_transfer_data(monkeypatch, tmp_path):
@@ -97,19 +121,11 @@ def test_transfer_flag_controls_category_ui(monkeypatch, tmp_path):
     response = client.get("/transactions")
     html = response.get_data(as_text=True)
     assert f'value="{transfer_id}"' in html  # editable category selector
-    assert not re.search(
-        r'<label><input type="checkbox" class="cat-cb" name="category_id" value="'
-        + str(transfer_id),
-        html,
-    )
+    assert str(transfer_id) not in _category_filter_ids(html)
 
     client.post(f"/categories/{transfer_id}/transfer", data={"is_transfer": "0"})
     response = client.get("/transactions")
-    assert re.search(
-        r'<label><input type="checkbox" class="cat-cb" name="category_id" value="'
-        + str(transfer_id),
-        response.get_data(as_text=True),
-    )
+    assert str(transfer_id) in _category_filter_ids(response.get_data(as_text=True))
 
     # Checked HTML forms submit both hidden 0 and checked 1 values.
     client.post(
