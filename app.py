@@ -1328,8 +1328,16 @@ def transactions():
                FROM refunds r JOIN transactions rt ON rt.account_id=r.refund_account_id AND rt.transaction_id=r.refund_transaction_id
                JOIN transactions pt ON pt.account_id=r.purchase_account_id AND pt.transaction_id=r.purchase_transaction_id"""
         ):
-            refund_links[(link[0],link[1])] = ("Refund of purchase: " + link[5], link[0], link[1])
-            refund_links[(link[3],link[4])] = ("Purchase refunded by: " + link[2], link[0], link[1])
+            refund_links[(link[0], link[1])] = (
+                "Refund of purchase: " + link[5],
+                link[0],
+                link[1],
+            )
+            refund_links[(link[3], link[4])] = (
+                "Purchase refunded by: " + link[2],
+                link[0],
+                link[1],
+            )
         accounts = connection.execute(
             "SELECT id, name FROM accounts ORDER BY name COLLATE NOCASE"
         ).fetchall()
@@ -1372,11 +1380,25 @@ def transactions():
                JOIN accounts a ON a.id=rt.account_id LEFT JOIN account_owners ao ON ao.account_id=a.id
                LEFT JOIN categories c ON c.id=t.category_id LEFT JOIN categories parent ON parent.id=c.parent_id
                WHERE 1=1"""
-            + ((" AND " + " AND ".join(
-                clause.replace("COALESCE(t.posted_date, t.transacted_at)", "COALESCE(rt.posted_date, rt.transacted_at)")
-                for clause in chart_clauses
-            )) if chart_clauses else "")
-            + (" GROUP BY COALESCE(parent.id,c.id),COALESCE(parent.name,c.name)" if rollup else " GROUP BY t.category_id,c.name"),
+            + (
+                (
+                    " AND "
+                    + " AND ".join(
+                        clause.replace(
+                            "COALESCE(t.posted_date, t.transacted_at)",
+                            "COALESCE(rt.posted_date, rt.transacted_at)",
+                        )
+                        for clause in chart_clauses
+                    )
+                )
+                if chart_clauses
+                else ""
+            )
+            + (
+                " GROUP BY COALESCE(parent.id,c.id),COALESCE(parent.name,c.name)"
+                if rollup
+                else " GROUP BY t.category_id,c.name"
+            ),
             chart_values,
         ).fetchall()
         spend_totals = {name: float(amount or 0) for name, amount in spend_rows}
@@ -1678,13 +1700,31 @@ def _posted_transfer_suggestion(connection, source, candidate):
 def approve_refund():
     connection = _connect()
     try:
-        purchase = (request.form.get("purchase_account_id", ""), request.form.get("purchase_transaction_id", ""))
-        refund = (request.form.get("refund_account_id", ""), request.form.get("refund_transaction_id", ""))
-        pair = next((p for p in suggest_refund_pairs(connection) if (p["purchase"]["account_id"],p["purchase"]["transaction_id"]) == purchase and (p["refund"]["account_id"],p["refund"]["transaction_id"]) == refund), None)
+        purchase = (
+            request.form.get("purchase_account_id", ""),
+            request.form.get("purchase_transaction_id", ""),
+        )
+        refund = (
+            request.form.get("refund_account_id", ""),
+            request.form.get("refund_transaction_id", ""),
+        )
+        pair = next(
+            (
+                p
+                for p in suggest_refund_pairs(connection)
+                if (p["purchase"]["account_id"], p["purchase"]["transaction_id"])
+                == purchase
+                and (p["refund"]["account_id"], p["refund"]["transaction_id"]) == refund
+            ),
+            None,
+        )
         if pair is None:
             flash("That refund suggestion is no longer available.", "error")
         else:
-            connection.execute("INSERT INTO refunds(refund_account_id,refund_transaction_id,purchase_account_id,purchase_transaction_id) VALUES(?,?,?,?)", (*refund, *purchase))
+            connection.execute(
+                "INSERT INTO refunds(refund_account_id,refund_transaction_id,purchase_account_id,purchase_transaction_id) VALUES(?,?,?,?)",
+                (*refund, *purchase),
+            )
             connection.commit()
             flash("Refund linked to its purchase.", "success")
     finally:
@@ -1696,7 +1736,13 @@ def approve_refund():
 def undo_refund():
     connection = _connect()
     try:
-        connection.execute("DELETE FROM refunds WHERE refund_account_id=? AND refund_transaction_id=?", (request.form.get("refund_account_id", ""), request.form.get("refund_transaction_id", "")))
+        connection.execute(
+            "DELETE FROM refunds WHERE refund_account_id=? AND refund_transaction_id=?",
+            (
+                request.form.get("refund_account_id", ""),
+                request.form.get("refund_transaction_id", ""),
+            ),
+        )
         connection.commit()
         flash("Refund association removed.", "success")
     finally:
