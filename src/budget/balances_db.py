@@ -104,6 +104,19 @@ def _connect(db_path: str | os.PathLike[str] | None = None) -> sqlite3.Connectio
         FOREIGN KEY (account_id_b, transaction_id_b)
             REFERENCES transactions(account_id, transaction_id) ON UPDATE CASCADE ON DELETE CASCADE
     )""")
+    connection.execute("""CREATE TABLE IF NOT EXISTS refunds (
+        refund_account_id TEXT NOT NULL,
+        refund_transaction_id TEXT NOT NULL,
+        purchase_account_id TEXT NOT NULL,
+        purchase_transaction_id TEXT NOT NULL,
+        approved_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (refund_account_id, refund_transaction_id),
+        UNIQUE (purchase_account_id, purchase_transaction_id),
+        FOREIGN KEY (refund_account_id, refund_transaction_id)
+            REFERENCES transactions(account_id, transaction_id) ON UPDATE CASCADE ON DELETE CASCADE,
+        FOREIGN KEY (purchase_account_id, purchase_transaction_id)
+            REFERENCES transactions(account_id, transaction_id) ON UPDATE CASCADE ON DELETE CASCADE
+    )""")
     # Create categorization tables before adding their foreign-key columns to
     # an existing transactions table.
     connection.execute("""CREATE TABLE IF NOT EXISTS categories (
@@ -185,7 +198,7 @@ def _connect(db_path: str | os.PathLike[str] | None = None) -> sqlite3.Connectio
         connection.execute(
             "ALTER TABLE balance_snapshots ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'"
         )
-    connection.execute("PRAGMA user_version = 8")
+    connection.execute("PRAGMA user_version = 9")
     return connection
 
 

@@ -43,6 +43,7 @@ from budget.categorizer import categorize_transaction, recategorize_all
 from budget.config import ConfigError, get_env, load_toml
 from budget.sheets import build_service, fetch_cells, list_sheet_names
 from budget.transfers import suggest_transfer_pairs, transfer_pair_key
+from budget.refunds import suggest_refund_pairs, REFUND_MATCH_WINDOW_DAYS
 
 load_dotenv()
 
@@ -311,9 +312,10 @@ def load_sqlite_monthly_trends() -> dict:
     try:
         rows = connection.execute(
             """SELECT substr(COALESCE(t.posted_date, t.transacted_at), 1, 7) AS month,
-                      SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income,
-                      SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END) AS expenses
+                      SUM(CASE WHEN t.amount > 0 AND r.refund_transaction_id IS NULL THEN t.amount ELSE 0 END) AS income,
+                      SUM(CASE WHEN t.amount < 0 THEN -t.amount ELSE 0 END)-SUM(CASE WHEN r.refund_transaction_id IS NOT NULL THEN t.amount ELSE 0 END) AS expenses
                FROM transactions t LEFT JOIN categories c ON c.id=t.category_id
+               LEFT JOIN refunds r ON r.refund_account_id=t.account_id AND r.refund_transaction_id=t.transaction_id
                WHERE COALESCE(t.posted_date, t.transacted_at) IS NOT NULL
                  AND t.pending = 0 AND """
             + _non_transfer_clause("t")
@@ -1299,11 +1301,13 @@ def transactions():
         ).fetchone()[0]
         rows = connection.execute(
             """SELECT t.account_id, t.transaction_id, COALESCE(t.posted_date, t.transacted_at),
-                      a.name, t.description, t.pending, t.amount, t.category_id,
+                      a.name, t.description, t.pending, t.amount, COALESCE(pt.category_id,t.category_id),
                       CASE WHEN parent.id IS NULL THEN c.name ELSE parent.name || ' › ' || c.name END,
                       t.is_manual_category
                FROM transactions t JOIN accounts a ON a.id=t.account_id LEFT JOIN account_owners ao ON ao.account_id=a.id
-               LEFT JOIN categories c ON c.id=t.category_id LEFT JOIN categories parent ON parent.id=c.parent_id"""
+               LEFT JOIN refunds r ON r.refund_account_id=t.account_id AND r.refund_transaction_id=t.transaction_id
+               LEFT JOIN transactions pt ON pt.account_id=r.purchase_account_id AND pt.transaction_id=r.purchase_transaction_id
+               LEFT JOIN categories c ON c.id=COALESCE(pt.category_id,t.category_id) LEFT JOIN categories parent ON parent.id=c.parent_id"""
             + where
             + (
                 " ORDER BY t.amount "
@@ -1317,6 +1321,15 @@ def transactions():
             + " LIMIT ? OFFSET ?",
             [*values, per_page, (page - 1) * per_page],
         ).fetchall()
+        refund_links = {}
+        for link in connection.execute(
+            """SELECT r.refund_account_id,r.refund_transaction_id,rt.description,
+                      r.purchase_account_id,r.purchase_transaction_id,pt.description
+               FROM refunds r JOIN transactions rt ON rt.account_id=r.refund_account_id AND rt.transaction_id=r.refund_transaction_id
+               JOIN transactions pt ON pt.account_id=r.purchase_account_id AND pt.transaction_id=r.purchase_transaction_id"""
+        ):
+            refund_links[(link[0],link[1])] = ("Refund of purchase: " + link[5], link[0], link[1])
+            refund_links[(link[3],link[4])] = ("Purchase refunded by: " + link[2], link[0], link[1])
         accounts = connection.execute(
             "SELECT id, name FROM accounts ORDER BY name COLLATE NOCASE"
         ).fetchall()
@@ -1352,6 +1365,24 @@ def transactions():
             + " ORDER BY 2 DESC",
             chart_values,
         ).fetchall()
+        refund_spend = connection.execute(
+            """SELECT COALESCE(" + category_expr + ", 'Uncategorized'), SUM(-rt.amount)
+               FROM refunds r JOIN transactions rt ON rt.account_id=r.refund_account_id AND rt.transaction_id=r.refund_transaction_id
+               JOIN transactions t ON t.account_id=r.purchase_account_id AND t.transaction_id=r.purchase_transaction_id
+               JOIN accounts a ON a.id=rt.account_id LEFT JOIN account_owners ao ON ao.account_id=a.id
+               LEFT JOIN categories c ON c.id=t.category_id LEFT JOIN categories parent ON parent.id=c.parent_id
+               WHERE 1=1"""
+            + ((" AND " + " AND ".join(
+                clause.replace("COALESCE(t.posted_date, t.transacted_at)", "COALESCE(rt.posted_date, rt.transacted_at)")
+                for clause in chart_clauses
+            )) if chart_clauses else "")
+            + (" GROUP BY COALESCE(parent.id,c.id),COALESCE(parent.name,c.name)" if rollup else " GROUP BY t.category_id,c.name"),
+            chart_values,
+        ).fetchall()
+        spend_totals = {name: float(amount or 0) for name, amount in spend_rows}
+        for name, amount in refund_spend:
+            spend_totals[name] = spend_totals.get(name, 0) - float(amount or 0)
+        spend_rows = [(name, max(amount, 0)) for name, amount in spend_totals.items()]
     finally:
         connection.close()
     transactions_data = [
@@ -1374,6 +1405,11 @@ def transactions():
         )
         for row in rows
     ]
+    for row in transactions_data:
+        association = refund_links.get((row["account_id"], row["transaction_id"]))
+        row["refund_association"] = association[0] if association else None
+        row["refund_account_id"] = association[1] if association else None
+        row["refund_transaction_id"] = association[2] if association else None
     filters = {
         "account_id": account_id,
         "category_id": category_ids,
@@ -1554,6 +1590,15 @@ def attention():
     connection = _connect()
     try:
         suggestions = suggest_transfer_pairs(connection)
+        refund_suggestions = suggest_refund_pairs(connection)
+        approved_refunds = connection.execute(
+            """SELECT r.refund_account_id,r.refund_transaction_id,ra.name,
+                      COALESCE(rt.posted_date,rt.transacted_at),rt.description,rt.amount,
+                      pa.name,COALESCE(pt.posted_date,pt.transacted_at),pt.description
+               FROM refunds r JOIN transactions rt ON rt.account_id=r.refund_account_id AND rt.transaction_id=r.refund_transaction_id
+               JOIN accounts ra ON ra.id=r.refund_account_id JOIN transactions pt ON pt.account_id=r.purchase_account_id AND pt.transaction_id=r.purchase_transaction_id
+               JOIN accounts pa ON pa.id=r.purchase_account_id ORDER BY COALESCE(rt.posted_date,rt.transacted_at) DESC"""
+        ).fetchall()
         unmatched_sheet_names = connection.execute(
             """SELECT s.account, MAX(s.date), COUNT(*),
                       (SELECT latest.amount FROM balance_snapshots latest
@@ -1597,6 +1642,9 @@ def attention():
     return render_template(
         "transfers.html",
         suggestions=suggestions,
+        refund_suggestions=refund_suggestions,
+        refund_window=REFUND_MATCH_WINDOW_DAYS,
+        approved_refunds=approved_refunds,
         unmatched_sheet_names=[
             {"name": row[0], "latest_date": row[1], "count": row[2], "amount": row[3]}
             for row in unmatched_sheet_names
@@ -1624,6 +1672,36 @@ def _posted_transfer_suggestion(connection, source, candidate):
         if transfer_pair_key(suggestion["source"], suggestion["candidate"]) == pair:
             return suggestion
     return None
+
+
+@app.post("/refunds/approve")
+def approve_refund():
+    connection = _connect()
+    try:
+        purchase = (request.form.get("purchase_account_id", ""), request.form.get("purchase_transaction_id", ""))
+        refund = (request.form.get("refund_account_id", ""), request.form.get("refund_transaction_id", ""))
+        pair = next((p for p in suggest_refund_pairs(connection) if (p["purchase"]["account_id"],p["purchase"]["transaction_id"]) == purchase and (p["refund"]["account_id"],p["refund"]["transaction_id"]) == refund), None)
+        if pair is None:
+            flash("That refund suggestion is no longer available.", "error")
+        else:
+            connection.execute("INSERT INTO refunds(refund_account_id,refund_transaction_id,purchase_account_id,purchase_transaction_id) VALUES(?,?,?,?)", (*refund, *purchase))
+            connection.commit()
+            flash("Refund linked to its purchase.", "success")
+    finally:
+        connection.close()
+    return redirect(url_for("attention"))
+
+
+@app.post("/refunds/undo")
+def undo_refund():
+    connection = _connect()
+    try:
+        connection.execute("DELETE FROM refunds WHERE refund_account_id=? AND refund_transaction_id=?", (request.form.get("refund_account_id", ""), request.form.get("refund_transaction_id", "")))
+        connection.commit()
+        flash("Refund association removed.", "success")
+    finally:
+        connection.close()
+    return redirect(url_for("attention"))
 
 
 def _transfer_form_pair(connection):
