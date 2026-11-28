@@ -24,9 +24,28 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:.6rem;bo
   <details class="cat-dropdown" id="catDropdown">
     <summary id="catSummary">Select categories...</summary>
     <div class="cat-menu">
-      <label class="cat-select-all"><input type="checkbox" id="catSelectAll"> Select All</label>
-      <label><input type="checkbox" class="cat-cb" name="category_id" value="uncategorized" {% if 'uncategorized' in filters.category_id %}checked{% endif %}>Uncategorized</label>
-      {% for id,name in chart_categories %}<label><input type="checkbox" class="cat-cb" name="category_id" value="{{ id }}" {% if id|string in filters.category_id %}checked{% endif %}>{{ name }}</label>{% endfor %}
+      <label class="cat-select-all">
+        <input type="checkbox" id="catSelectAll"> Select All
+      </label>
+      <label>
+        {% if 'uncategorized' in filters.category_id %}
+          <input type="checkbox" class="cat-cb" name="category_id" value="uncategorized" checked>
+        {% else %}
+          <input type="checkbox" class="cat-cb" name="category_id" value="uncategorized">
+        {% endif %}
+        Uncategorized
+      </label>
+      {% for id, name in chart_categories %}
+        {% set id_str = id ~ '' %}
+        <label>
+          {% if id_str in filters.category_id %}
+            <input type="checkbox" class="cat-cb" name="category_id" value="{{ id }}" checked>
+          {% else %}
+            <input type="checkbox" class="cat-cb" name="category_id" value="{{ id }}">
+          {% endif %}
+          {{ name }}
+        </label>
+      {% endfor %}
     </div>
   </details>
 </span>
